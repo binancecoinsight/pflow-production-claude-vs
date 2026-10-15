@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Building2, ArrowRight, ShieldCheck, LogOut } from 'lucide-react';
-import { SuiteDownloadLink } from './SuiteDownloadLink';
 
 export const SelectPharmacyScreen: React.FC = () => {
   const { user, profile, memberships, selectPharmacy, signOut } = useAuth();
@@ -76,10 +75,6 @@ export const SelectPharmacyScreen: React.FC = () => {
           ))}
         </div>
 
-        {/* Direct Download Link for Full Suite */}
-        <div className="mb-6">
-          <SuiteDownloadLink variant="banner" />
-        </div>
 
         {/* Footer Actions */}
         <div className="text-center pt-4 border-t border-slate-900">

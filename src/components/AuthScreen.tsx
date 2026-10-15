@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { Lock, Mail, User, AlertCircle, CheckCircle2, ArrowRight, ShieldCheck } from 'lucide-react';
-import { SuiteDownloadLink } from './SuiteDownloadLink';
 
 export const AuthScreen: React.FC = () => {
   const { signIn, signUp } = useAuth();
@@ -191,10 +190,6 @@ export const AuthScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Direct Download Link for Full Suite & SQL Migrations */}
-        <div className="mt-6">
-          <SuiteDownloadLink variant="banner" />
-        </div>
 
         {/* Security Assurance Badge */}
         <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">

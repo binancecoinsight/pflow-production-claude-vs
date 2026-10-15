@@ -30,7 +30,6 @@ import { CashReconciliationView } from './cash/CashReconciliationView';
 import { SuppliersView } from './suppliers/SuppliersView';
 import { ReportsView } from './reports/ReportsView';
 import { DeviceManagementView } from './devices/DeviceManagementView';
-import { SuiteDownloadLink } from './SuiteDownloadLink';
 
 export const AuthenticatedShell: React.FC = () => {
   const { 
@@ -259,11 +258,8 @@ export const AuthenticatedShell: React.FC = () => {
           </button>
         </div>
 
-        {/* User Context, Suite Download & Sign Out */}
+        {/* User Context & Sign Out */}
         <div className="flex items-center gap-3">
-          {/* Direct Browser Download Link for Full Suite */}
-          <SuiteDownloadLink variant="nav" />
-
           {/* Authoritative Role Badge */}
           <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border tracking-wider flex items-center gap-1.5 ${getRoleBadgeColor(role)}`}>
             <ShieldCheck className="w-3.5 h-3.5" />

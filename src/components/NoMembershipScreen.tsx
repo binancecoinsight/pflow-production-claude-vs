@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Building2, LogOut, RefreshCw, ShieldAlert } from 'lucide-react';
-import { SuiteDownloadLink } from './SuiteDownloadLink';
 
 export const NoMembershipScreen: React.FC = () => {
   const { user, profile, signOut, refreshContext } = useAuth();
@@ -49,10 +48,6 @@ export const NoMembershipScreen: React.FC = () => {
           </button>
         </div>
 
-        {/* Direct Download Link */}
-        <div className="mt-6 pt-5 border-t border-slate-800/80">
-          <SuiteDownloadLink variant="banner" />
-        </div>
       </div>
     </div>
   );
