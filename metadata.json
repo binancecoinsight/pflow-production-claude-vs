@@ -1,0 +1,6 @@
+{
+  "name": "PharmacyFlow - Enterprise POS & Pharmacy Management",
+  "description": "Offline-first pharmacy management system with cryptographic POS terminal enrollment, inventory control, and multi-tenant security.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

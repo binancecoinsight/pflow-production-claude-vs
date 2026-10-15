@@ -1,0 +1,6 @@
+{
+  "name": "Pharmacy Flow Support",
+  "description": "Central Admin portal for managing pharmacy owners, sales, and subscriptions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

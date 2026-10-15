@@ -1,0 +1,12 @@
+{
+  "name": "pharmacy flow",
+  "description": "A comprehensive pharmacy management system for tracking inventory, managing sales, monitoring business performance, and video tutorials.",
+  "requestFramePermissions": [
+    "camera",
+    "bluetooth",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
