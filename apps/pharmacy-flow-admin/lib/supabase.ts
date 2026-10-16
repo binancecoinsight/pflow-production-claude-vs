@@ -1,12 +1,5 @@
-import { createBrowserClient } from '@supabase/ssr';
-
-export const createClient = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    return null;
-  }
-
-  return createBrowserClient(url, key);
-};
+/**
+ * Backward-compatible Supabase client entry point.
+ * Exports the browser client for client components.
+ */
+export { createClient } from './supabase/client';

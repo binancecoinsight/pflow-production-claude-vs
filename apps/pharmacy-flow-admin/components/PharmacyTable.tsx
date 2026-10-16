@@ -13,16 +13,18 @@ interface PharmacyTableProps {
   onRenamePharmacy?: (pharmacy: Pharmacy) => void;
   onResetPasswordPharmacy?: (pharmacy: Pharmacy) => void;
   onSendMessagePharmacy?: (pharmacy: Pharmacy) => void;
+  canSuspend?: boolean;
 }
 
 const ITEMS_PER_PAGE = 10;
 
-export default function PharmacyTable({ 
-  pharmacies, 
+export default function PharmacyTable({
+  pharmacies,
   onRenewPharmacy,
   onRenamePharmacy,
   onResetPasswordPharmacy,
   onSendMessagePharmacy,
+  canSuspend = true,
 }: PharmacyTableProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
@@ -34,7 +36,7 @@ export default function PharmacyTable({
   const filteredData = useMemo(() => {
     return pharmacies
       .filter((p) => {
-        const matchesSearch = 
+        const matchesSearch =
           p.business_name.toLowerCase().includes(search.toLowerCase()) ||
           p.owner_name.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
@@ -152,7 +154,7 @@ export default function PharmacyTable({
                   ₦{p.daily_sales.toLocaleString()}
                 </td>
                 <td className="p-4 text-right">
-                  <button 
+                  <button
                     onClick={() => setSelectedPharmacy(p)}
                     className="p-1.5 hover:bg-white/10 rounded-md transition-colors text-text-secondary hover:text-text-primary"
                   >
@@ -188,7 +190,7 @@ export default function PharmacyTable({
               </div>
               <div className="p-2 space-y-1">
                 {onRenewPharmacy && (
-                  <button 
+                  <button
                     onClick={() => {
                       const p = selectedPharmacy;
                       setSelectedPharmacy(null);
@@ -200,7 +202,7 @@ export default function PharmacyTable({
                   </button>
                 )}
                 {onSendMessagePharmacy && (
-                  <button 
+                  <button
                     onClick={() => {
                       const p = selectedPharmacy;
                       setSelectedPharmacy(null);
@@ -212,7 +214,7 @@ export default function PharmacyTable({
                   </button>
                 )}
                 {onRenamePharmacy && (
-                  <button 
+                  <button
                     onClick={() => {
                       const p = selectedPharmacy;
                       setSelectedPharmacy(null);
@@ -224,7 +226,7 @@ export default function PharmacyTable({
                   </button>
                 )}
                 {onResetPasswordPharmacy && (
-                  <button 
+                  <button
                     onClick={() => {
                       const p = selectedPharmacy;
                       setSelectedPharmacy(null);
@@ -235,21 +237,25 @@ export default function PharmacyTable({
                     <Key className="w-4 h-4 text-amber-500" /> Reset Password
                   </button>
                 )}
-                <button 
-                  onClick={() => handleAction('suspend store access', selectedPharmacy)}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium text-text-secondary hover:bg-error/10 hover:text-error transition-colors"
-                >
-                  <ShieldAlert className="w-4 h-4" /> Suspend Store
-                </button>
-                <button 
-                  onClick={() => handleAction('delete store record', selectedPharmacy)}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium text-text-secondary hover:bg-error/10 hover:text-error transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" /> Delete Store
-                </button>
+                {canSuspend && (
+                  <>
+                    <button
+                      onClick={() => handleAction('suspend store access', selectedPharmacy)}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium text-text-secondary hover:bg-error/10 hover:text-error transition-colors"
+                    >
+                      <ShieldAlert className="w-4 h-4" /> Suspend Store
+                    </button>
+                    <button
+                      onClick={() => handleAction('delete store record', selectedPharmacy)}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium text-text-secondary hover:bg-error/10 hover:text-error transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" /> Delete Store
+                    </button>
+                  </>
+                )}
               </div>
               <div className="p-3 bg-white/5 border-t border-border">
-                <button 
+                <button
                   onClick={() => setSelectedPharmacy(null)}
                   className="w-full py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
                 >

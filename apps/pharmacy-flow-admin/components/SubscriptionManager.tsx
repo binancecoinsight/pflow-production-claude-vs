@@ -11,9 +11,9 @@ import { format, differenceInDays } from 'date-fns';
 
 interface SubscriptionManagerProps {
   pharmacies: Pharmacy[];
-  onOpenRenewModal: (pharmacy?: Pharmacy | null) => void;
+  onOpenRenewModal?: (pharmacy?: Pharmacy | null) => void;
   onOpenSendMessageModal: (pharmacy: Pharmacy) => void;
-  onOpenSuspendModal: (pharmacy: Pharmacy) => void;
+  onOpenSuspendModal?: (pharmacy: Pharmacy) => void;
 }
 
 const ITEMS_PER_PAGE = 12;
@@ -147,15 +147,17 @@ export default function SubscriptionManager({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => onOpenRenewModal(null)}
-            className="w-full sm:w-auto bg-accent text-white hover:bg-accent/90 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98]"
-          >
-            <RotateCw className="w-4 h-4" />
-            <span>Renew Subscription</span>
-          </button>
-        </div>
+        {onOpenRenewModal && (
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => onOpenRenewModal(null)}
+              className="w-full sm:w-auto bg-accent text-white hover:bg-accent/90 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98]"
+            >
+              <RotateCw className="w-4 h-4" />
+              <span>Renew Subscription</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* KPI Stats Cards */}
@@ -432,20 +434,22 @@ export default function SubscriptionManager({
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         {/* Renew */}
-                        <button
-                          onClick={() => onOpenRenewModal(pharmacy)}
-                          title="Renew Subscription"
-                          className={`px-2.5 py-1.5 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition-all shadow-sm ${
-                            isExpired
-                              ? 'bg-error text-white hover:bg-error/90'
-                              : isExpiring
-                              ? 'bg-amber-600 text-white hover:bg-amber-600/90'
-                              : 'bg-accent text-white hover:bg-accent/90'
-                          }`}
-                        >
-                          <RotateCw className="w-3 h-3" />
-                          <span className="hidden sm:inline">Renew</span>
-                        </button>
+                        {onOpenRenewModal && (
+                          <button
+                            onClick={() => onOpenRenewModal(pharmacy)}
+                            title="Renew Subscription"
+                            className={`px-2.5 py-1.5 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition-all shadow-sm ${
+                              isExpired
+                                ? 'bg-error text-white hover:bg-error/90'
+                                : isExpiring
+                                ? 'bg-amber-600 text-white hover:bg-amber-600/90'
+                                : 'bg-accent text-white hover:bg-accent/90'
+                            }`}
+                          >
+                            <RotateCw className="w-3 h-3" />
+                            <span className="hidden sm:inline">Renew</span>
+                          </button>
+                        )}
 
                         {/* Send Message */}
                         <button
@@ -458,22 +462,24 @@ export default function SubscriptionManager({
                         </button>
 
                         {/* Suspend or Restore Access */}
-                        <button
-                          onClick={() => onOpenSuspendModal(pharmacy)}
-                          title={pharmacy.is_suspended ? "Restore POS Access" : "Suspend Pharmacy Access"}
-                          className={`p-1.5 rounded-md border transition-colors ${
-                            pharmacy.is_suspended
-                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
-                              : 'border-border bg-bg/60 text-text-secondary hover:text-red-500 hover:border-red-500/40 hover:bg-red-500/10'
-                          }`}
-                          aria-label={pharmacy.is_suspended ? "Restore access" : "Suspend access"}
-                        >
-                          {pharmacy.is_suspended ? (
-                            <Unlock className="w-3.5 h-3.5" />
-                          ) : (
-                            <Ban className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                        {onOpenSuspendModal && (
+                          <button
+                            onClick={() => onOpenSuspendModal(pharmacy)}
+                            title={pharmacy.is_suspended ? "Restore POS Access" : "Suspend Pharmacy Access"}
+                            className={`p-1.5 rounded-md border transition-colors ${
+                              pharmacy.is_suspended
+                                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                                : 'border-border bg-bg/60 text-text-secondary hover:text-red-500 hover:border-red-500/40 hover:bg-red-500/10'
+                            }`}
+                            aria-label={pharmacy.is_suspended ? "Restore access" : "Suspend access"}
+                          >
+                            {pharmacy.is_suspended ? (
+                              <Unlock className="w-3.5 h-3.5" />
+                            ) : (
+                              <Ban className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

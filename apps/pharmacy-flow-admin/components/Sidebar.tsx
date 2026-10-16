@@ -1,21 +1,33 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  LayoutDashboard, Store, Users, Settings, LogOut, BarChart3, 
-  ShieldCheck, Bell, ChevronRight, ChevronDown, Trash2, Edit3, 
+import {
+  LayoutDashboard, Store, Users, Settings, LogOut, BarChart3,
+  ShieldCheck, Bell, ChevronRight, ChevronDown, Trash2, Edit3,
   Key, PlusCircle, Search, AlertTriangle, Menu, X, History, Sparkles, CreditCard,
   CheckCircle2, Clock, Calendar, Gift, LifeBuoy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecentUpdate } from '@/lib/mock-data';
+import { createClient } from '@/lib/supabase';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   currentView: string;
   onSelectView: (view: string) => void;
+  permissions?: {
+    canViewOverview?: boolean;
+    canViewSubscriptions?: boolean;
+    canViewSupportTickets?: boolean;
+    canViewPharmacies?: boolean;
+    canViewOwners?: boolean;
+    canViewFinancials?: boolean;
+    canManageSubscriptions?: boolean;
+    canSuspendStores?: boolean;
+    [key: string]: boolean | undefined;
+  };
   expiringCount?: number;
   pendingRewardsCount?: number;
   openTicketsCount?: number;
@@ -28,11 +40,12 @@ interface SidebarProps {
   onOpenAddPharmacyModal?: () => void;
 }
 
-export default function Sidebar({ 
-  isOpen, 
+export default function Sidebar({
+  isOpen,
   onClose,
   currentView,
   onSelectView,
+  permissions,
   expiringCount = 0,
   pendingRewardsCount = 0,
   openTicketsCount = 0,
@@ -50,7 +63,7 @@ export default function Sidebar({
   const [updateFilter, setUpdateFilter] = useState('24h');
   const [refTime] = useState(() => Date.now());
 
-  const navItems = [
+  const allNavItems = [
     { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
     { id: 'subscriptions', icon: CreditCard, label: 'Subscriptions', badge: expiringCount > 0 ? `${expiringCount} due` : undefined, badgeColor: 'bg-amber-500/20 text-amber-500 border-amber-500/30' },
     { id: 'support_tickets', icon: LifeBuoy, label: 'Support Tickets', badge: openTicketsCount > 0 ? `${openTicketsCount} open` : undefined, badgeColor: 'bg-rose-500/20 text-rose-400 border-rose-500/30' },
@@ -61,6 +74,13 @@ export default function Sidebar({
     { id: 'analytics', icon: BarChart3, label: 'Analytics' },
     { id: 'compliance', icon: ShieldCheck, label: 'Compliance' },
   ];
+
+  const navItems = allNavItems.filter((item) => {
+    if (!permissions) return true;
+    if (item.id === 'subscriptions' && permissions.canViewSubscriptions === false) return false;
+    if (item.id === 'analytics' && permissions.canViewFinancials === false) return false;
+    return true;
+  });
 
   const handleAdminAction = (action: string) => {
     if (action === 'renew subscription' && onOpenRenewModal) {
@@ -123,8 +143,8 @@ export default function Sidebar({
               <span className="text-[10px] text-text-secondary font-mono tracking-wider uppercase mt-0.5 block">Nigeria Admin</span>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="lg:hidden p-1.5 hover:bg-white/10 rounded-md text-text-secondary hover:text-text-primary"
             aria-label="Close sidebar"
           >
@@ -175,7 +195,7 @@ export default function Sidebar({
               </div>
               {updatesOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
             </button>
-            
+
             <AnimatePresence>
               {updatesOpen && (
                 <motion.div
@@ -186,7 +206,7 @@ export default function Sidebar({
                 >
                   <div className="px-1">
                     <label className="text-[10px] text-text-secondary font-medium block mb-1">Filter Timeframe:</label>
-                    <select 
+                    <select
                       value={updateFilter}
                       onChange={(e) => setUpdateFilter(e.target.value)}
                       className="w-full bg-bg border border-border rounded py-1 px-2 text-[10px] text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
@@ -203,7 +223,7 @@ export default function Sidebar({
 
                   <div className="space-y-2 max-h-48 overflow-y-auto px-1">
                     {filteredUpdates.map((item) => (
-                      <div 
+                      <div
                         key={item.id}
                         className="p-2 rounded bg-bg/60 border border-border/70 hover:border-accent/40 transition-colors"
                       >
@@ -265,13 +285,13 @@ export default function Sidebar({
                 >
                   <div className="relative mb-1">
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-secondary" />
-                    <input 
-                      type="text" 
-                      placeholder="Search stores..." 
+                    <input
+                      type="text"
+                      placeholder="Search stores..."
                       className="w-full bg-bg border border-border rounded py-1 pl-7 pr-2 text-[10px] focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   </div>
-                  <button 
+                  <button
                     onClick={() => {
                       if (onOpenBroadcastModal) onOpenBroadcastModal('all');
                       onClose();
@@ -281,7 +301,7 @@ export default function Sidebar({
                     <span>Send to All Stores</span>
                     <span className="text-[9px] px-1 bg-accent/15 text-accent rounded font-mono">500+</span>
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       if (onOpenBroadcastModal) onOpenBroadcastModal('selected');
                       onClose();
@@ -290,7 +310,7 @@ export default function Sidebar({
                   >
                     Select Specific Stores...
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       if (onOpenBroadcastModal) onOpenBroadcastModal('scheduled');
                       onClose();
@@ -305,77 +325,79 @@ export default function Sidebar({
             </AnimatePresence>
           </div>
 
-          {/* Administrative Menu */}
-          <div className="pt-2">
-            <button
-              onClick={() => setAdminOpen(!adminOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-text-secondary hover:bg-white/5 hover:text-text-primary transition-colors"
-            >
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Administrative</span>
-              </div>
-              {adminOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-            </button>
-            <AnimatePresence>
-              {adminOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden pl-7 pr-2 space-y-1 mt-1"
-                >
-                  <button 
-                    onClick={() => {
-                      if (onOpenRenewModal) onOpenRenewModal();
-                      onClose();
-                    }}
-                    className="w-full flex items-center gap-2 py-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
+          {/* Administrative Menu (Restricted to roles with management authority) */}
+          {(!permissions || permissions.canManageSubscriptions || permissions.canSuspendStores) && (
+            <div className="pt-2">
+              <button
+                onClick={() => setAdminOpen(!adminOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-text-secondary hover:bg-white/5 hover:text-text-primary transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Administrative</span>
+                </div>
+                {adminOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              </button>
+              <AnimatePresence>
+                {adminOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden pl-7 pr-2 space-y-1 mt-1"
                   >
-                    <CreditCard className="w-3 h-3" /> Renew Subscriptions
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (onOpenAddPharmacyModal) onOpenAddPharmacyModal();
-                      else if (onOpenRenewModal) onOpenRenewModal();
-                      onClose();
-                    }}
-                    className="w-full flex items-center gap-2 py-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
-                  >
-                    <PlusCircle className="w-3 h-3" /> Add New Pharmacy
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (onOpenRenameModal) onOpenRenameModal();
-                      onClose();
-                    }}
-                    className="w-full flex items-center gap-2 py-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
-                  >
-                    <Edit3 className="w-3 h-3" /> Rename Stores
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (onOpenResetPasswordModal) onOpenResetPasswordModal();
-                      onClose();
-                    }}
-                    className="w-full flex items-center gap-2 py-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
-                  >
-                    <Key className="w-3 h-3" /> Reset Passwords
-                  </button>
-                  <button 
-                    onClick={() => handleAdminAction('delete pharmacy')}
-                    className="w-full flex items-center gap-2 py-1.5 text-[11px] text-error hover:bg-error/10 transition-colors rounded px-1"
-                  >
-                    <Trash2 className="w-3 h-3" /> Delete Pharmacy
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                    <button
+                      onClick={() => {
+                        if (onOpenRenewModal) onOpenRenewModal();
+                        onClose();
+                      }}
+                      className="w-full flex items-center gap-2 py-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
+                    >
+                      <CreditCard className="w-3 h-3" /> Renew Subscriptions
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (onOpenAddPharmacyModal) onOpenAddPharmacyModal();
+                        else if (onOpenRenewModal) onOpenRenewModal();
+                        onClose();
+                      }}
+                      className="w-full flex items-center gap-2 py-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
+                    >
+                      <PlusCircle className="w-3 h-3" /> Add New Pharmacy
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (onOpenRenameModal) onOpenRenameModal();
+                        onClose();
+                      }}
+                      className="w-full flex items-center gap-2 py-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
+                    >
+                      <Edit3 className="w-3 h-3" /> Rename Stores
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (onOpenResetPasswordModal) onOpenResetPasswordModal();
+                        onClose();
+                      }}
+                      className="w-full flex items-center gap-2 py-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
+                    >
+                      <Key className="w-3 h-3" /> Reset Passwords
+                    </button>
+                    <button
+                      onClick={() => handleAdminAction('delete pharmacy')}
+                      className="w-full flex items-center gap-2 py-1.5 text-[11px] text-error hover:bg-error/10 transition-colors rounded px-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> Delete Pharmacy
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </nav>
 
         <div className="p-3 border-t border-border space-y-1 bg-card/90">
-          <button 
+          <button
             onClick={() => {
               if (onOpenSettings) onOpenSettings();
               onClose();
@@ -385,9 +407,20 @@ export default function Sidebar({
             <Settings className="w-4 h-4" />
             <span>Settings & Theme</span>
           </button>
-          <button 
-            onClick={() => alert('Signing out of administrator session.')}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-text-secondary hover:bg-error/10 hover:text-error transition-colors"
+          <button
+            onClick={async () => {
+              try {
+                const supabase = createClient();
+                if (supabase) {
+                  await supabase.auth.signOut();
+                }
+              } catch (err) {
+                console.error('Logout error:', err);
+              } finally {
+                window.location.href = '/login';
+              }
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-text-secondary hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             <span>Logout</span>

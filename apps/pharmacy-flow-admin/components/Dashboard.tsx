@@ -18,10 +18,10 @@ import ReferralManager from './ReferralManager';
 import GiveRewardModal from './GiveRewardModal';
 import AnalyticsView from './AnalyticsView';
 import SupportTicketsView from './SupportTicketsView';
-import { 
-  Pharmacy, 
-  generateMockPharmacies, 
-  RecentUpdate, 
+import {
+  Pharmacy,
+  generateMockPharmacies,
+  RecentUpdate,
   generateInitialUpdates,
   ActivityLog,
   generateInitialActivities,
@@ -50,26 +50,41 @@ import {
   generateInitialSupportTickets
 } from '@/lib/mock-data';
 import { createClient } from '@/lib/supabase';
-import { 
-  Bell, Search, User, Menu, Settings, CreditCard, RotateCw, 
-  ChevronRight, CheckCircle2, ShieldCheck, Store, Sparkles, MessageSquare, Ban,
+import { ROLE_ACCESS_MATRIX, type PlatformAdminRole } from '@/lib/auth';
+import {
+  Bell, Search, User, Menu, Settings, CreditCard, RotateCw,
+  ChevronRight, CheckCircle2, ShieldCheck, ShieldAlert, Store, Sparkles, MessageSquare, Ban,
   Gift, LifeBuoy
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-export type DashboardView = 
-  | 'overview' 
-  | 'subscriptions' 
+export type DashboardView =
+  | 'overview'
+  | 'subscriptions'
   | 'support_tickets'
-  | 'referrals' 
+  | 'referrals'
   | 'refferal'
-  | 'whats_new' 
-  | 'pharmacies' 
-  | 'owners' 
-  | 'analytics' 
+  | 'whats_new'
+  | 'pharmacies'
+  | 'owners'
+  | 'analytics'
   | 'compliance';
 
-export default function Dashboard() {
+export interface DashboardProps {
+  adminUser?: any;
+  adminProfile?: {
+    user_id?: string;
+    platform_role?: string;
+    is_active?: boolean;
+    granted_at?: string;
+    notes?: string | null;
+  } | null;
+}
+
+export default function Dashboard({ adminUser, adminProfile }: DashboardProps = {}) {
+  const userRole = (adminProfile?.platform_role as PlatformAdminRole) || 'SUPPORT';
+  const permissions = ROLE_ACCESS_MATRIX[userRole] || ROLE_ACCESS_MATRIX.SUPPORT;
+
   const [currentView, setCurrentView] = useState<DashboardView>('overview');
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [payments, setPayments] = useState<SubscriptionPayment[]>([]);
@@ -87,7 +102,7 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [greeting, setGreeting] = useState('');
-  
+
   // Modals state
   const [renewModalOpen, setRenewModalOpen] = useState(false);
   const [selectedPharmacyForRenewal, setSelectedPharmacyForRenewal] = useState<Pharmacy | null>(null);
@@ -118,7 +133,7 @@ export default function Dashboard() {
     async function fetchData() {
       try {
         const supabase = createClient();
-        
+
         if (!supabase) {
           // Fallback to mock data if keys are missing
           const mocks = generateMockPharmacies(500);
@@ -197,17 +212,17 @@ export default function Dashboard() {
   }, []);
 
   // Compute key counters
-  const totalActive = useMemo(() => 
+  const totalActive = useMemo(() =>
     pharmacies.filter(p => !p.is_suspended && (p.subscription_status === 'active' || p.status === 'active')).length,
     [pharmacies]
   );
-  
-  const totalSales = useMemo(() => 
+
+  const totalSales = useMemo(() =>
     pharmacies.reduce((acc, p) => acc + (p.daily_sales || 0), 0),
     [pharmacies]
   );
 
-  const expiringSoonCount = useMemo(() => 
+  const expiringSoonCount = useMemo(() =>
     pharmacies.filter(p => p.subscription_status === 'expiring_soon' && !p.is_suspended).length,
     [pharmacies]
   );
@@ -219,7 +234,7 @@ export default function Dashboard() {
   };
 
   const handleConfirmRenewal = (
-    updatedPharmacy: Pharmacy, 
+    updatedPharmacy: Pharmacy,
     details: {
       plan: SubscriptionPlan;
       cycle: SubscriptionCycle;
@@ -240,7 +255,7 @@ export default function Dashboard() {
     const newUpdate: RecentUpdate = {
       id: `up-${Date.now()}`,
       type: details.isNewStore ? 'store_created' : 'subscription_renewed',
-      title: details.isNewStore 
+      title: details.isNewStore
         ? `New Store: ${updatedPharmacy.business_name}`
         : `Renewal: ${updatedPharmacy.business_name}`,
       subtitle: `${details.plan} (${details.cycle}) • ₦${details.amount.toLocaleString()} paid`,
@@ -340,7 +355,7 @@ export default function Dashboard() {
   };
 
   const handleToggleSuspension = (pharmacy: Pharmacy, suspend: boolean, reason: string) => {
-    setPharmacies(prev => 
+    setPharmacies(prev =>
       prev.map(p => {
         if (p.id === pharmacy.id) {
           return {
@@ -356,7 +371,7 @@ export default function Dashboard() {
     const newActivity: ActivityLog = {
       id: `act-${Date.now()}`,
       action_type: suspend ? 'access_suspended' : 'access_restored',
-      title: suspend 
+      title: suspend
         ? `Suspended POS Access for ${pharmacy.business_name}`
         : `Restored POS Access for ${pharmacy.business_name}`,
       description: suspend
@@ -377,7 +392,7 @@ export default function Dashboard() {
     setActivities(prev => [newActivity, ...prev]);
 
     setToastNotification(
-      suspend 
+      suspend
         ? `Access suspended for ${pharmacy.business_name}`
         : `Access restored for ${pharmacy.business_name}`
     );
@@ -463,7 +478,7 @@ export default function Dashboard() {
 
   // Rename Store Handler
   const handleConfirmRename = (pharmacy: Pharmacy, newName: string, newState: string) => {
-    setPharmacies(prev => 
+    setPharmacies(prev =>
       prev.map(p => {
         if (p.id === pharmacy.id) {
           return {
@@ -498,8 +513,8 @@ export default function Dashboard() {
 
   // Reset Password Handler
   const handleConfirmResetPassword = (
-    pharmacy: Pharmacy, 
-    method: 'generate_temp' | 'send_link' | 'custom', 
+    pharmacy: Pharmacy,
+    method: 'generate_temp' | 'send_link' | 'custom',
     details: { tempPassword?: string; forceReset: boolean }
   ) => {
     const newActivity: ActivityLog = {
@@ -686,8 +701,8 @@ export default function Dashboard() {
 
   // Support Tickets & Client Inquiries Handlers
   const handleReplySupportTicket = (
-    ticketId: string, 
-    messageText: string, 
+    ticketId: string,
+    messageText: string,
     options?: { isInternal?: boolean; newStatus?: TicketStatus }
   ) => {
     let targetTicket: SupportTicket | undefined;
@@ -722,7 +737,7 @@ export default function Dashboard() {
       const newActivity: ActivityLog = {
         id: `act-ticket-${Date.now()}`,
         action_type: isInternal ? 'message_sent' : 'ticket_replied',
-        title: isInternal 
+        title: isInternal
           ? `Internal Staff Note on ${targetTicket.ticket_number}`
           : `Replied to Ticket ${targetTicket.ticket_number} (${targetTicket.pharmacy_name})`,
         description: isInternal
@@ -745,7 +760,7 @@ export default function Dashboard() {
       setActivities(prev => [newActivity, ...prev]);
 
       setToastNotification(
-        isInternal 
+        isInternal
           ? `Internal note saved on ticket ${targetTicket.ticket_number}.`
           : `Reply sent to ${targetTicket.client_name} (${targetTicket.pharmacy_name}).`
       );
@@ -853,11 +868,12 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-bg text-text-primary overflow-hidden">
       {/* Sidebar with Navigation and Live Recent Updates */}
-      <Sidebar 
-        isOpen={sidebarOpen} 
+      <Sidebar
+        isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         currentView={currentView}
         onSelectView={(v) => setCurrentView(v as any)}
+        permissions={permissions}
         expiringCount={expiringSoonCount}
         pendingRewardsCount={pendingRewardsCount}
         openTicketsCount={openTicketsCount}
@@ -881,12 +897,12 @@ export default function Dashboard() {
           setRenewModalOpen(true);
         }}
       />
-      
+
       <main className="flex-1 flex flex-col overflow-hidden lg:pl-64">
         {/* Top Header */}
         <header className="h-16 border-b border-border flex items-center justify-between px-3 sm:px-6 md:px-8 bg-card/60 backdrop-blur-md z-40 shrink-0">
           <div className="flex items-center gap-2 sm:gap-4">
-            <button 
+            <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden p-2 hover:bg-white/10 rounded-md transition-colors text-text-primary"
               aria-label="Open navigation menu"
@@ -896,7 +912,7 @@ export default function Dashboard() {
 
             {/* Breadcrumb Navigation */}
             <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold tracking-tight">
-              <span 
+              <span
                 onClick={() => setCurrentView('overview')}
                 className="cursor-pointer text-text-secondary hover:text-text-primary transition-colors hidden sm:inline"
               >
@@ -932,16 +948,18 @@ export default function Dashboard() {
               <span>Broadcast</span>
             </button>
 
-            {/* Quick Renew Button in Header */}
-            <button
-              onClick={() => handleOpenRenewModal(null)}
-              className="bg-accent text-white hover:bg-accent/90 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-            >
-              <RotateCw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Renew</span>
-            </button>
+            {/* Quick Renew Button in Header (Restricted to roles with subscription management authority) */}
+            {permissions.canManageSubscriptions && (
+              <button
+                onClick={() => handleOpenRenewModal(null)}
+                className="bg-accent text-white hover:bg-accent/90 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Renew</span>
+              </button>
+            )}
 
-            <button 
+            <button
               onClick={() => setSettingsOpen(true)}
               className="p-2 hover:bg-white/10 rounded-md transition-colors text-text-secondary hover:text-accent"
               aria-label="Settings"
@@ -950,7 +968,7 @@ export default function Dashboard() {
             </button>
 
             {/* Referrals & Incentives Header Button */}
-            <button 
+            <button
               onClick={() => setCurrentView('referrals')}
               className="relative p-2 hover:bg-white/10 rounded-md transition-colors text-text-secondary hover:text-text-primary"
               title="Customer Referrals & Entitlements"
@@ -962,7 +980,7 @@ export default function Dashboard() {
               )}
             </button>
 
-            <button 
+            <button
               onClick={() => setCurrentView('whats_new')}
               className="relative p-2 hover:bg-white/10 rounded-md transition-colors text-text-secondary hover:text-text-primary"
               title="View What's New"
@@ -972,26 +990,28 @@ export default function Dashboard() {
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full ring-2 ring-card" />
             </button>
 
-            <button 
-              onClick={() => setCurrentView('subscriptions')}
-              className="relative p-2 hover:bg-white/10 rounded-md transition-colors text-text-secondary hover:text-text-primary"
-              title="Subscriptions"
-              aria-label="Notifications"
-            >
-              <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-              {expiringSoonCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-card" />
-              )}
-            </button>
+            {permissions.canViewSubscriptions && (
+              <button
+                onClick={() => setCurrentView('subscriptions')}
+                className="relative p-2 hover:bg-white/10 rounded-md transition-colors text-text-secondary hover:text-text-primary"
+                title="Subscriptions"
+                aria-label="Notifications"
+              >
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                {expiringSoonCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-card" />
+                )}
+              </button>
+            )}
 
             {/* Profile pill */}
             <div className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-border">
               <div className="text-right hidden md:block">
-                <p className="text-xs font-semibold leading-tight">Admin User</p>
-                <p className="text-[10px] text-text-secondary uppercase tracking-tight">Super Admin</p>
+                <p className="text-xs font-semibold leading-tight">{adminUser?.email ? adminUser.email.split('@')[0] : 'Admin User'}</p>
+                <p className="text-[10px] text-text-secondary uppercase tracking-tight">{adminProfile?.platform_role || 'Platform Admin'}</p>
               </div>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-accent/20 flex items-center justify-center border border-accent/30 text-accent font-bold text-xs">
-                AU
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-accent/20 flex items-center justify-center border border-accent/30 text-accent font-bold text-xs uppercase">
+                {adminUser?.email ? adminUser.email.slice(0, 2) : 'PA'}
               </div>
             </div>
           </div>
@@ -1004,7 +1024,7 @@ export default function Dashboard() {
               <CheckCircle2 className="w-4 h-4" />
               <span>{toastNotification}</span>
             </div>
-            <button 
+            <button
               onClick={() => setToastNotification(null)}
               className="hover:underline text-[11px] opacity-80 hover:opacity-100"
             >
@@ -1018,7 +1038,7 @@ export default function Dashboard() {
 
         {/* Renew Subscription Modal (Search & Add / Renew) */}
         {renewModalOpen && (
-          <RenewSubscriptionModal 
+          <RenewSubscriptionModal
             key={selectedPharmacyForRenewal ? selectedPharmacyForRenewal.id : 'new-renewal-modal'}
             isOpen={renewModalOpen}
             onClose={() => {
@@ -1033,7 +1053,7 @@ export default function Dashboard() {
 
         {/* Send Message Modal */}
         {sendMessageModalOpen && selectedPharmacyForMessage && (
-          <SendMessageModal 
+          <SendMessageModal
             isOpen={sendMessageModalOpen}
             onClose={() => {
               setSendMessageModalOpen(false);
@@ -1046,7 +1066,7 @@ export default function Dashboard() {
 
         {/* Suspend Access Modal */}
         {suspendModalOpen && selectedPharmacyForSuspend && (
-          <SuspendAccessModal 
+          <SuspendAccessModal
             isOpen={suspendModalOpen}
             onClose={() => {
               setSuspendModalOpen(false);
@@ -1059,7 +1079,7 @@ export default function Dashboard() {
 
         {/* Broadcast Modal */}
         {broadcastModalOpen && (
-          <BroadcastModal 
+          <BroadcastModal
             isOpen={broadcastModalOpen}
             onClose={() => setBroadcastModalOpen(false)}
             pharmacies={pharmacies}
@@ -1072,7 +1092,7 @@ export default function Dashboard() {
 
         {/* Rename Store Modal */}
         {renameModalOpen && (
-          <RenameStoreModal 
+          <RenameStoreModal
             isOpen={renameModalOpen}
             onClose={() => {
               setRenameModalOpen(false);
@@ -1086,7 +1106,7 @@ export default function Dashboard() {
 
         {/* Reset Password Modal */}
         {resetPasswordModalOpen && (
-          <ResetPasswordModal 
+          <ResetPasswordModal
             isOpen={resetPasswordModalOpen}
             onClose={() => {
               setResetPasswordModalOpen(false);
@@ -1100,7 +1120,7 @@ export default function Dashboard() {
 
         {/* Give Reward & Entitlement Modal */}
         {giveRewardModalOpen && (
-          <GiveRewardModal 
+          <GiveRewardModal
             key={selectedReferralForReward ? selectedReferralForReward.id : selectedReferrerForReward ? selectedReferrerForReward.id : 'give-reward-modal'}
             isOpen={giveRewardModalOpen}
             onClose={() => {
@@ -1130,17 +1150,29 @@ export default function Dashboard() {
             <div className="max-w-7xl mx-auto space-y-6">
               {/* VIEW 1: Subscriptions View */}
               {currentView === 'subscriptions' && (
-                <SubscriptionManager 
-                  pharmacies={pharmacies}
-                  onOpenRenewModal={handleOpenRenewModal}
-                  onOpenSendMessageModal={handleOpenSendMessageModal}
-                  onOpenSuspendModal={handleOpenSuspendModal}
-                />
+                permissions.canViewSubscriptions ? (
+                  <SubscriptionManager
+                    pharmacies={pharmacies}
+                    onOpenRenewModal={permissions.canManageSubscriptions ? handleOpenRenewModal : undefined}
+                    onOpenSendMessageModal={handleOpenSendMessageModal}
+                    onOpenSuspendModal={permissions.canSuspendStores ? handleOpenSuspendModal : undefined}
+                  />
+                ) : (
+                  <div className="bg-card border border-border rounded-xl p-8 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-error/15 text-error flex items-center justify-center mx-auto">
+                      <ShieldAlert className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-lg font-bold">Access Restricted</h3>
+                    <p className="text-xs text-text-secondary max-w-md mx-auto">
+                      Subscriptions management is restricted to ADMIN and SUPER_ADMIN roles. Your current platform role is {adminProfile?.platform_role || 'SUPPORT'}.
+                    </p>
+                  </div>
+                )
               )}
 
               {/* VIEW 2: Customer Referrals & Entitlements View */}
               {(currentView === 'referrals' || currentView === 'refferal') && (
-                <ReferralManager 
+                <ReferralManager
                   referrals={referrals}
                   referrers={referrers}
                   presets={presets}
@@ -1154,7 +1186,7 @@ export default function Dashboard() {
 
               {/* VIEW: Client Support Tickets & Helpdesk */}
               {currentView === 'support_tickets' && (
-                <SupportTicketsView 
+                <SupportTicketsView
                   tickets={supportTickets}
                   pharmacies={pharmacies}
                   onReplyTicket={handleReplySupportTicket}
@@ -1167,7 +1199,7 @@ export default function Dashboard() {
 
               {/* VIEW 3: What's New Activity Log View */}
               {currentView === 'whats_new' && (
-                <WhatsNewView 
+                <WhatsNewView
                   activities={activities}
                   onOpenRenewModal={(pId) => {
                     const found = pharmacies.find(p => p.id === pId);
@@ -1182,14 +1214,21 @@ export default function Dashboard() {
                   {/* Greeting Section */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">{greeting}, Admin</h2>
+                      <h2 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2.5">
+                        <span>{greeting}, {adminUser?.email ? adminUser.email.split('@')[0] : 'Admin'}</span>
+                        {adminProfile?.platform_role && (
+                          <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 tracking-wider">
+                            {adminProfile.platform_role}
+                          </span>
+                        )}
+                      </h2>
                       <p className="text-text-secondary text-xs sm:text-sm mt-1">
                         Here is what is happening across Nigeria&apos;s licensed pharmacy network today.
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button 
+                      <button
                         onClick={() => {
                           setBroadcastInitialMode('all');
                           setBroadcastModalOpen(true);
@@ -1199,21 +1238,23 @@ export default function Dashboard() {
                         <Bell className="w-3.5 h-3.5 text-accent" />
                         <span>Push Broadcast</span>
                       </button>
-                      <button 
-                        onClick={() => handleOpenRenewModal(null)}
-                        className="bg-accent text-white hover:bg-accent/90 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-                      >
-                        <RotateCw className="w-3.5 h-3.5" />
-                        <span>Renew Subscription</span>
-                      </button>
-                      <button 
+                      {permissions.canManageSubscriptions && (
+                        <button
+                          onClick={() => handleOpenRenewModal(null)}
+                          className="bg-accent text-white hover:bg-accent/90 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                          <span>Renew Subscription</span>
+                        </button>
+                      )}
+                      <button
                         onClick={() => setCurrentView('whats_new')}
                         className="bg-card border border-border hover:border-accent/40 text-text-primary px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-accent" />
                         <span>What&apos;s New</span>
                       </button>
-                      <button 
+                      <button
                         onClick={() => setCurrentView('support_tickets')}
                         className="bg-card border border-border hover:border-rose-500/40 text-text-primary px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
                       >
@@ -1229,13 +1270,13 @@ export default function Dashboard() {
                   </div>
 
                   {/* High level KPI summary with click-through to Subscriptions */}
-                  <KpiStats 
-                    totalActive={totalActive} 
-                    totalSales={totalSales} 
+                  <KpiStats
+                    totalActive={totalActive}
+                    totalSales={totalSales}
                     expiringSoon={expiringSoonCount}
-                    onNavigateToSubscriptions={() => setCurrentView('subscriptions')}
+                    onNavigateToSubscriptions={permissions.canViewSubscriptions ? () => setCurrentView('subscriptions') : undefined}
                   />
-                  
+
                   {/* Section Title & Quick Table */}
                   <div className="flex items-center justify-between">
                     <div>
@@ -1243,7 +1284,7 @@ export default function Dashboard() {
                       <p className="text-xs text-text-secondary">All stores connected to centralized POS and inventory sync.</p>
                     </div>
                     <div className="flex items-center gap-2.5">
-                      <button 
+                      <button
                         onClick={() => {
                           setSelectedPharmacyForRename(null);
                           setRenameModalOpen(true);
@@ -1252,18 +1293,20 @@ export default function Dashboard() {
                       >
                         Rename Store
                       </button>
-                      <button 
-                        onClick={() => handleOpenRenewModal(null)}
-                        className="text-xs bg-accent text-white px-3 py-1.5 rounded-md font-medium hover:bg-accent/90 transition-colors"
-                      >
-                        + Add / Renew Store
-                      </button>
+                      {permissions.canManageSubscriptions && (
+                        <button
+                          onClick={() => handleOpenRenewModal(null)}
+                          className="text-xs bg-accent text-white px-3 py-1.5 rounded-md font-medium hover:bg-accent/90 transition-colors"
+                        >
+                          + Add / Renew Store
+                        </button>
+                      )}
                     </div>
                   </div>
-                  
-                  <PharmacyTable 
-                    pharmacies={pharmacies} 
-                    onRenewPharmacy={(p) => handleOpenRenewModal(p)}
+
+                  <PharmacyTable
+                    pharmacies={pharmacies}
+                    onRenewPharmacy={permissions.canManageSubscriptions ? (p) => handleOpenRenewModal(p) : undefined}
                     onRenamePharmacy={(p) => {
                       setSelectedPharmacyForRename(p);
                       setRenameModalOpen(true);
@@ -1273,6 +1316,7 @@ export default function Dashboard() {
                       setResetPasswordModalOpen(true);
                     }}
                     onSendMessagePharmacy={(p) => handleOpenSendMessageModal(p)}
+                    canSuspend={permissions.canSuspendStores}
                   />
                 </>
               )}
@@ -1286,7 +1330,7 @@ export default function Dashboard() {
                       <p className="text-xs text-text-secondary">Comprehensive listing of all onboarded drug stores and chemists.</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button 
+                      <button
                         onClick={() => {
                           setBroadcastInitialMode('all');
                           setBroadcastModalOpen(true);
@@ -1296,18 +1340,20 @@ export default function Dashboard() {
                         <Bell className="w-3.5 h-3.5 text-accent" />
                         <span>Broadcast Alert</span>
                       </button>
-                      <button 
-                        onClick={() => handleOpenRenewModal(null)}
-                        className="bg-accent text-white hover:bg-accent/90 px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
-                      >
-                        <RotateCw className="w-3.5 h-3.5" />
-                        <span>Renew or Add Store</span>
-                      </button>
+                      {permissions.canManageSubscriptions && (
+                        <button
+                          onClick={() => handleOpenRenewModal(null)}
+                          className="bg-accent text-white hover:bg-accent/90 px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                          <span>Renew or Add Store</span>
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <PharmacyTable 
+                  <PharmacyTable
                     pharmacies={pharmacies}
-                    onRenewPharmacy={(p) => handleOpenRenewModal(p)}
+                    onRenewPharmacy={permissions.canManageSubscriptions ? (p) => handleOpenRenewModal(p) : undefined}
                     onRenamePharmacy={(p) => {
                       setSelectedPharmacyForRename(p);
                       setRenameModalOpen(true);
@@ -1317,19 +1363,32 @@ export default function Dashboard() {
                       setResetPasswordModalOpen(true);
                     }}
                     onSendMessagePharmacy={(p) => handleOpenSendMessageModal(p)}
+                    canSuspend={permissions.canSuspendStores}
                   />
                 </div>
               )}
 
               {/* VIEW 5: Subscription Revenue & Operating Financials Analytics */}
               {currentView === 'analytics' && (
-                <AnalyticsView 
-                  payments={payments}
-                  expenses={expenses}
-                  onAddExpense={handleAddExpense}
-                  onDeleteExpense={handleDeleteExpense}
-                  onOpenRenewModal={() => handleOpenRenewModal(null)}
-                />
+                permissions.canViewFinancials ? (
+                  <AnalyticsView
+                    payments={payments}
+                    expenses={expenses}
+                    onAddExpense={permissions.canRecordExpenses ? handleAddExpense : () => {}}
+                    onDeleteExpense={permissions.canRecordExpenses ? handleDeleteExpense : () => {}}
+                    onOpenRenewModal={permissions.canManageSubscriptions ? () => handleOpenRenewModal(null) : () => {}}
+                  />
+                ) : (
+                  <div className="bg-card border border-border rounded-xl p-8 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-error/15 text-error flex items-center justify-center mx-auto">
+                      <ShieldAlert className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-lg font-bold">Access Restricted</h3>
+                    <p className="text-xs text-text-secondary max-w-md mx-auto">
+                      Financial analytics and ledger reports are restricted to ADMIN and SUPER_ADMIN roles. Your current platform role is {adminProfile?.platform_role || 'SUPPORT'}.
+                    </p>
+                  </div>
+                )
               )}
 
               {/* VIEW 6: Owners & Compliance placeholders */}
@@ -1345,13 +1404,13 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <div className="flex items-center justify-center gap-3 pt-2">
-                    <button 
+                    <button
                       onClick={() => setCurrentView('subscriptions')}
                       className="bg-accent text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-accent/90"
                     >
                       Go to Subscriptions Panel
                     </button>
-                    <button 
+                    <button
                       onClick={() => setCurrentView('whats_new')}
                       className="border border-border text-text-secondary hover:text-text-primary px-4 py-2 rounded-lg text-xs font-semibold"
                     >
