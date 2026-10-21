@@ -48,6 +48,7 @@ async function runInventoryUiTestSuite() {
   const batchA2_1 = 'cccccccc-3333-4ccc-8ccc-cccccccccccc';
   const batchA3_def = 'cccccccc-4444-4ccc-8ccc-cccccccccccc';
   const batchB1_1 = 'dddddddd-1111-4ddd-8ddd-dddddddddddd';
+  const expiringSoonDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const snapshotA: InventorySnapshot = {
     pharmacy_id: pharmacyA,
@@ -115,7 +116,7 @@ async function runInventoryUiTestSuite() {
         product_id: prodA1,
         branch_id: branchA,
         batch_number: 'LOT-AMX-002',
-        expiry_date: '2026-10-15', // Expiring soon (<90 days)
+        expiry_date: expiringSoonDate, // Expiring soon (<90 days)
         quantity: 45,
         selling_price: 3500,
         cost_price: 2100,

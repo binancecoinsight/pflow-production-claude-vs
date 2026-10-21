@@ -4,6 +4,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { NoMembershipScreen } from './components/NoMembershipScreen';
 import { SelectPharmacyScreen } from './components/SelectPharmacyScreen';
 import { AuthenticatedShell } from './components/AuthenticatedShell';
+import { OfflineSyncRuntime } from './components/OfflineSyncRuntime';
 import { RefreshCw, AlertCircle, LogOut } from 'lucide-react';
 
 function AppContent() {
@@ -41,7 +42,12 @@ function AppContent() {
 
   // 5. Authenticated & Context Ready
   if (state === 'authenticated_ready') {
-    return <AuthenticatedShell />;
+    return (
+      <>
+        <OfflineSyncRuntime />
+        <AuthenticatedShell />
+      </>
+    );
   }
 
   // 6. Authenticated Error State

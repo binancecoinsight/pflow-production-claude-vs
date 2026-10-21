@@ -9,9 +9,10 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { HistoricalSale } from './history';
 import { PaymentMethod } from './types';
 import { createLocalTransaction } from '../offline/db';
-import { isOnline } from '../offline/network';
+import { calculateRefundV2, RefundV2ItemInput } from './refundV2';
 
 export interface ReturnItemInput {
+  sale_item_id?: string;
   product_id: string;
   batch_id: string;
   quantity: number;
@@ -24,6 +25,8 @@ export interface ProcessReturnInput {
   sale_id: string;
   items: ReturnItemInput[];
   refund_amount: number; // in integer minor units or currency amount
+  original_payment_method?: PaymentMethod;
+  sale?: HistoricalSale;
   refund_payment_method: PaymentMethod;
   reason: string;
   client_op_id?: string;
@@ -56,6 +59,7 @@ export interface ProcessReturnResult {
   success: boolean;
   return_id?: string;
   refund_amount?: number;
+  refund_amount_minor?: number;
   status?: string;
   offline_queued?: boolean;
   error?: string;
@@ -179,28 +183,38 @@ export const submitSaleReturn = async (
     return { success: false, error: 'At least one line item must be selected for return' };
   }
 
-  if (input.refund_amount < 0) {
-    return { success: false, error: 'Refund amount cannot be negative' };
+  if (!input.sale || !input.original_payment_method || !input.items.every((item) => item.sale_item_id)) {
+    return { success: false, error: 'Refund V2 requires authoritative sale-item identities and original payment method' };
   }
+  if (input.refund_payment_method !== input.original_payment_method) return { success: false, error: 'Automatic refunds must use the original payment method' };
+  let expectedRefundMinor: number;
+  try {
+    expectedRefundMinor = calculateRefundV2(input.sale, input.items as RefundV2ItemInput[]).total_minor;
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Invalid Refund V2 request' };
+  }
+  if (input.refund_amount !== expectedRefundMinor) return { success: false, error: 'Refund total does not match the authoritative V2 calculation' };
 
-  // If offline mode is requested or browser is disconnected, queue in durable IndexedDB store
-  if (input.forceOffline || !isOnline()) {
-    try {
+  // V2 is service-role-only: every new return is durably queued for the trusted Edge gateway.
+  try {
       await createLocalTransaction({
         pharmacy_id: normPharmacy,
         client_op_id: clientOpId,
         transaction_type: 'SALE_RETURN',
         payload: {
           pharmacy_id: normPharmacy,
+          contract_version: 2,
           branch_id: normBranch,
           sale_id: normSale,
           items: input.items.map((i) => ({
+            sale_item_id: i.sale_item_id!.toLowerCase().trim(),
             product_id: i.product_id.toLowerCase().trim(),
             batch_id: i.batch_id.toLowerCase().trim(),
             quantity: Math.floor(i.quantity),
             restock_to_inventory: i.restock_to_inventory ?? true
           })),
-          refund_amount: input.refund_amount,
+          expected_refund_amount_minor: expectedRefundMinor,
+          original_payment_method: input.original_payment_method,
           refund_payment_method: input.refund_payment_method,
           reason: input.reason.trim()
         }
@@ -209,46 +223,13 @@ export const submitSaleReturn = async (
       return {
         success: true,
         return_id: clientOpId,
-        refund_amount: input.refund_amount,
+        refund_amount: expectedRefundMinor,
+        refund_amount_minor: expectedRefundMinor,
         status: 'PENDING',
         offline_queued: true
       };
-    } catch (offlineErr: unknown) {
+  } catch (offlineErr: unknown) {
       const msg = offlineErr instanceof Error ? offlineErr.message : 'Failed to queue offline return';
       return { success: false, error: msg };
-    }
-  }
-
-  try {
-    const { data, error } = await client.rpc('rpc_process_sale_return', {
-      p_pharmacy_id: normPharmacy,
-      p_branch_id: normBranch,
-      p_sale_id: normSale,
-      p_items: input.items.map((i) => ({
-        product_id: i.product_id.toLowerCase().trim(),
-        batch_id: i.batch_id.toLowerCase().trim(),
-        quantity: Math.floor(i.quantity),
-        restock_to_inventory: i.restock_to_inventory ?? true
-      })),
-      p_refund_amount: input.refund_amount,
-      p_refund_payment_method: input.refund_payment_method,
-      p_reason: input.reason.trim(),
-      p_client_op_id: clientOpId
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    return {
-      success: true,
-      return_id: row?.return_id,
-      refund_amount: Number(row?.refund_amount) || input.refund_amount,
-      status: row?.status || 'COMPLETED'
-    };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unexpected return execution error';
-    return { success: false, error: msg };
   }
 };

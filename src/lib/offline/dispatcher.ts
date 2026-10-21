@@ -34,6 +34,7 @@ import {
 export interface DispatcherConfig {
   edgeFunctionUrl?: string;
   returnFunctionUrl?: string;
+  returnV2FunctionUrl?: string;
   staleLeaseTimeoutMs?: number;
   fetchFn?: typeof fetch;
   rpcGetClientOpStatus?: (pharmacyId: string, clientOpId: string) => Promise<{
@@ -48,6 +49,7 @@ export class SyncDispatcher {
   private activeLocks = new Set<string>();
   private edgeFunctionUrl: string;
   private returnFunctionUrl: string;
+  private returnV2FunctionUrl: string;
   private staleLeaseTimeoutMs: number;
   private fetchFn: typeof fetch;
   private rpcGetClientOpStatus?: DispatcherConfig['rpcGetClientOpStatus'];
@@ -56,6 +58,7 @@ export class SyncDispatcher {
   constructor(config: DispatcherConfig = {}, customFactory?: IDBFactory) {
     this.edgeFunctionUrl = config.edgeFunctionUrl || '/functions/v1/sync-push-sale';
     this.returnFunctionUrl = config.returnFunctionUrl || '/functions/v1/sync-push-return';
+    this.returnV2FunctionUrl = config.returnV2FunctionUrl || '/functions/v1/sync-push-return-v2';
     this.staleLeaseTimeoutMs = config.staleLeaseTimeoutMs || 60000; // 60s
     this.fetchFn = config.fetchFn || (typeof fetch !== 'undefined' ? fetch.bind(globalThis) : async () => {
       throw new Error('fetch is not defined in this environment');
@@ -179,8 +182,9 @@ export class SyncDispatcher {
       const timestampStr = Date.now().toString();
       const nonce = crypto.randomUUID().toLowerCase();
       const isReturn = txRecord.transaction_type === 'SALE_RETURN';
-      const endpointUrl = isReturn ? this.returnFunctionUrl : this.edgeFunctionUrl;
-      const endpointPath = isReturn ? '/sync-push-return' : '/sync-push-sale';
+      const isReturnV2 = isReturn && txRecord.payload.contract_version === 2;
+      const endpointUrl = isReturn ? (isReturnV2 ? this.returnV2FunctionUrl : this.returnFunctionUrl) : this.edgeFunctionUrl;
+      const endpointPath = isReturn ? (isReturnV2 ? '/sync-push-return-v2' : '/sync-push-return') : '/sync-push-sale';
 
       const canonicalMessage = buildSyncSigningMessage({
         pharmacyId,
@@ -207,6 +211,9 @@ export class SyncDispatcher {
             nonce,
             sale_id: txRecord.payload.sale_id,
             items: txRecord.payload.items,
+            contract_version: isReturnV2 ? 2 : undefined,
+            expected_refund_amount_minor: isReturnV2 ? txRecord.payload.expected_refund_amount_minor : undefined,
+            original_payment_method: isReturnV2 ? txRecord.payload.original_payment_method : undefined,
             refund_amount: txRecord.payload.refund_amount,
             refund_payment_method: txRecord.payload.refund_payment_method,
             reason: txRecord.payload.reason,
@@ -296,9 +303,24 @@ export class SyncDispatcher {
         return { client_op_id: clientOpId, status: 'DEVICE_BLOCKED', error: currentItem.last_error || undefined };
       }
 
-      // Handle Conflict / Nonce or Payload Mismatch (HTTP 409)
+      // Conflicts include both terminal integrity failures and retryable nonce /
+      // concurrency outcomes. The gateway returns a typed error_code.
       if (response.status === 409) {
         const errorData = await response.json().catch(() => ({}));
+        const retryableCodes = new Set([
+          'NONCE_REPLAY',
+          'SERIALIZATION_FAILURE',
+          'DEADLOCK_DETECTED',
+          'OPERATION_IN_PROGRESS'
+        ]);
+        if (retryableCodes.has(errorData.error_code)) {
+          const retryable = transitionQueueItem(currentItem, 'RETRYABLE', {
+            error: errorData.error || errorData.error_code,
+            nextAttemptAt: calculateNextAttemptAt(currentItem.attempts)
+          });
+          await updateQueueItem(retryable, this.customFactory);
+          return { client_op_id: clientOpId, status: 'RETRYABLE', error: retryable.last_error || undefined };
+        }
         currentItem = transitionQueueItem(currentItem, 'PERMANENT_FAILURE', {
           error: errorData.error || 'Server rejected stock ingestion conflict'
         });

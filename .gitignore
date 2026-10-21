@@ -11,3 +11,7 @@ Thumbs.db
 *.pem
 *.key
 *.zip
+
+# Disposable local Supabase verification environments (never release artifacts)
+.clean-replay-disposable/
+.edge-integration-disposable/

@@ -17,6 +17,7 @@ import {
   calculateReturnableQuantities, 
   submitSaleReturn 
 } from '../../lib/sales/returns';
+import { calculateRefundV2 } from '../../lib/sales/refundV2';
 import { formatMinorUnits } from '../pos/formatters';
 import { supabase } from '../../lib/supabase';
 
@@ -37,7 +38,7 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
   const [isLoadingReturns, setIsLoadingReturns] = useState<boolean>(true);
   const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({});
   const [restockOptions, setRestockOptions] = useState<Record<string, boolean>>({});
-  const [refundMethod, setRefundMethod] = useState<PaymentMethod>(sale.payment_method);
+  const [refundMethod] = useState<PaymentMethod>(sale.payment_method);
   const [reason, setReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -70,16 +71,18 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
 
   // 3. Compute auto-calculated refund total
   const calculatedRefund = useMemo(() => {
-    let sum = 0;
-    for (const item of sale.line_items) {
-      const key = `${item.product_id.toLowerCase().trim()}:${item.batch_id.toLowerCase().trim()}`;
-      const qty = returnQuantities[key] || 0;
-      if (qty > 0) {
-        sum += qty * item.unit_price;
-      }
+    try {
+      const items = sale.line_items.map((item) => ({
+        sale_item_id: item.id,
+        product_id: item.product_id,
+        batch_id: item.batch_id,
+        quantity: returnQuantities[item.id] || 0
+      })).filter((item) => item.quantity > 0);
+      return items.length ? calculateRefundV2(sale, items).total_minor : 0;
+    } catch {
+      return 0;
     }
-    return sum;
-  }, [sale.line_items, returnQuantities]);
+  }, [sale, returnQuantities]);
 
   const totalReturnQuantity = useMemo(() => {
     return Object.values(returnQuantities).reduce((acc, q) => acc + q, 0);
@@ -126,9 +129,10 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
 
     const itemsToReturn = sale.line_items
       .map((item) => {
-        const key = `${item.product_id.toLowerCase().trim()}:${item.batch_id.toLowerCase().trim()}`;
+        const key = item.id;
         const qty = returnQuantities[key] || 0;
         return {
+          sale_item_id: item.id,
           product_id: item.product_id,
           batch_id: item.batch_id,
           quantity: qty,
@@ -144,6 +148,8 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
       items: itemsToReturn,
       refund_amount: calculatedRefund,
       refund_payment_method: refundMethod,
+      original_payment_method: sale.payment_method,
+      sale,
       reason: reason.trim()
     });
 
@@ -227,7 +233,7 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-mono">
                   {sale.line_items.map((item) => {
-                    const key = `${item.product_id.toLowerCase().trim()}:${item.batch_id.toLowerCase().trim()}`;
+                    const key = item.id;
                     const returnable = returnableMap.get(key) || 0;
                     const selectedQty = returnQuantities[key] || 0;
                     const restock = restockOptions[key] ?? true;
@@ -287,8 +293,7 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({
               </label>
               <select
                 value={refundMethod}
-                onChange={(e) => setRefundMethod(e.target.value as PaymentMethod)}
-                disabled={isSubmitting}
+                disabled
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-400 cursor-pointer"
               >
                 <option value="CASH">Cash</option>
