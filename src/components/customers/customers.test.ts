@@ -113,6 +113,7 @@ async function runCustomersCorrectionTestSuite() {
   const offlineSaleWithCustomer: Sale = {
     id: 's-offline-001',
     client_op_id: 'op-offline-001',
+    checkout_intent_id: 'op-offline-001',
     pharmacy_id: pharmacyA.id,
     branch_id: branchA.id,
     cashier_id: 'cashier-uuid-1',
@@ -167,6 +168,7 @@ async function runCustomersCorrectionTestSuite() {
   const anonymousOfflineSale: Sale = {
     id: 's-offline-anon',
     client_op_id: 'op-offline-anon',
+    checkout_intent_id: 'op-offline-anon',
     pharmacy_id: pharmacyA.id,
     branch_id: branchA.id,
     cashier_id: 'cashier-uuid-1',

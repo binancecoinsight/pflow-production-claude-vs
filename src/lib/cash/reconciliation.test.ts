@@ -94,6 +94,8 @@ async function runPhase5D14Suite() {
   const dummyCashierUuid = '55555555-5555-4555-8555-555555555555';
 
   const baseInput: CreateSaleInput = {
+    compatibility_non_draft: true,
+    checkout_intent_id: '66666666-6666-4666-8666-666666666666',
     pharmacy_id: dummyPharmacyUuid,
     branch_id: dummyBranchUuid,
     cashier_id: dummyCashierUuid,

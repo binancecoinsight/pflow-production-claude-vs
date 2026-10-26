@@ -153,7 +153,7 @@ async function runFinalVerificationSuite() {
       }
 
       // Business rule validation: create return and stock movement
-      const returnId = 'ret-' + crypto.randomUUID().toLowerCase();
+      const returnId = crypto.randomUUID().toLowerCase();
       dbSaleReturns.push({
         id: returnId,
         pharmacy_id: params.pharmacy_id,
@@ -326,10 +326,19 @@ async function runFinalVerificationSuite() {
     const found = dbSaleReturns.find((r) => r.pharmacy_id === pId && r.client_op_id === opId);
     if (found) {
       return {
+        pharmacy_id: pId,
         client_op_id: found.client_op_id,
-        status: found.status,
+        outcome: 'CONFIRMED_COMMITTED' as const,
+        operation_kind: 'SALE_RETURN_V1' as const,
+        payload_hash: tx2.payload_hash,
+        sale_id: found.original_sale_id,
+        checkout_intent_id: null,
         response_status: 'COMMITTED',
-        processed_at: found.created_at
+        response_payload: { operation_status: 'COMMITTED', client_op_id: found.client_op_id,
+          return_id: found.id, sale_id: found.original_sale_id, processed_at: found.created_at },
+        processed_at: found.created_at,
+        record_id: found.id,
+        return_id: found.id
       };
     }
     return null;
@@ -356,7 +365,7 @@ async function runFinalVerificationSuite() {
   assert(dbStockLedger.length === preDropLedgerCount + 1, '2.1: Stock ledger movement created on server');
 
   const droppedQueueItem = await getQueueItem(pharmacyA, tx2.client_op_id, indexedDB);
-  assert(droppedQueueItem?.status === 'RETRYABLE', '2.2: Local queue transitioned to RETRYABLE due to network error');
+  assert(droppedQueueItem?.status === 'UNCERTAIN', '2.2: Response loss is preserved as UNCERTAIN pending authoritative lookup');
 
   // Simulate crash/recovery: advance time past retry backoff and re-dispatch
   droppedQueueItem!.next_attempt_at = Date.now() - 1000;
@@ -366,7 +375,7 @@ async function runFinalVerificationSuite() {
   // Dispatcher retries: ambiguous resolution discovers authoritative return via client_op_id
   const recoverySummary = await recoveryDispatcher.dispatch(pharmacyA, deviceIdentity, 'manager-jwt');
 
-  assert(recoverySummary.succeeded === 1, '2.3: Ambiguous return successfully resolved as COMMITTED on retry');
+  assert(recoverySummary.processed === 0, '2.3: Ambiguous return resolved as COMMITTED without an automatic resend');
   assert(dbSaleReturns.length === preDropReturnCount + 1, '2.4: Zero duplicate return records created');
   assert(dbStockLedger.length === preDropLedgerCount + 1, '2.5: Zero duplicate stock ledger movements created');
 

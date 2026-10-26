@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   ShoppingCart, 
   Trash2, 
@@ -24,6 +24,7 @@ import { Customer, listCustomers, createCustomer } from '../../lib/customers/ind
 import { isOnline } from '../../lib/offline/network';
 import { supabase } from '../../lib/supabase';
 import { formatMinorUnits, formatDate } from './formatters';
+import { CheckoutAsyncBoundary, runCheckoutBoundTask } from './checkoutUiLifecycle';
 
 interface CartPanelProps {
   cart: PosCart;
@@ -48,6 +49,7 @@ export const CartPanel: React.FC<CartPanelProps> = ({
   onClearError,
   pharmacyId
 }) => {
+  const requestBoundary = useRef(new CheckoutAsyncBoundary(cart.checkout_intent_id));
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('CASH');
 
   // Cash Tender State (Phase 5D-14)
@@ -78,24 +80,35 @@ export const CartPanel: React.FC<CartPanelProps> = ({
   const [quickPhone, setQuickPhone] = useState<string>('');
   const [isSavingQuickCustomer, setIsSavingQuickCustomer] = useState<boolean>(false);
 
+  useEffect(() => {
+    requestBoundary.current.reset(cart.checkout_intent_id);
+    setSelectedPayment('CASH');
+    setCashTenderInput((cart.total / 100).toFixed(2));
+    setSelectedCustomer(null);
+    setIsCustomerSelectorOpen(false);
+    setCustomerSearchQuery('');
+    setCustomerList([]);
+    setIsLoadingCustomers(false);
+    setIsQuickCreateOpen(false);
+    setQuickName('');
+    setQuickPhone('');
+    setIsSavingQuickCustomer(false);
+  }, [cart.checkout_intent_id]);
+
+  useEffect(() => () => requestBoundary.current.invalidate(), []);
+
   // Load Customers for Selection
   const loadCustomers = useCallback(async (query: string) => {
     if (!pharmacyId) return;
     setIsLoadingCustomers(true);
-    try {
-      const res = await listCustomers(supabase, pharmacyId, {
+    const outcome = await runCheckoutBoundTask(requestBoundary.current, () => listCustomers(supabase, pharmacyId, {
         search: query,
         status: 'ACTIVE',
         limit: 15
-      });
-      if (res.success) {
-        setCustomerList(res.customers);
-      }
-    } catch {
-      // Ignored
-    } finally {
-      setIsLoadingCustomers(false);
-    }
+      }));
+    if (!outcome.accepted) return;
+    if ('value' in outcome && outcome.value.success) setCustomerList(outcome.value.customers);
+    setIsLoadingCustomers(false);
   }, [pharmacyId]);
 
   useEffect(() => {
@@ -110,25 +123,20 @@ export const CartPanel: React.FC<CartPanelProps> = ({
     if (!pharmacyId || !quickName.trim()) return;
 
     setIsSavingQuickCustomer(true);
-    try {
-      const res = await createCustomer(supabase, {
+    const outcome = await runCheckoutBoundTask(requestBoundary.current, () => createCustomer(supabase, {
         pharmacy_id: pharmacyId,
         name: quickName.trim(),
         phone: quickPhone.trim() || null
-      });
-
-      if (res.success && res.customer) {
-        setSelectedCustomer(res.customer);
+      }));
+    if (!outcome.accepted) return;
+    if ('value' in outcome && outcome.value.success && outcome.value.customer) {
+        setSelectedCustomer(outcome.value.customer);
         setIsQuickCreateOpen(false);
         setIsCustomerSelectorOpen(false);
         setQuickName('');
         setQuickPhone('');
-      }
-    } catch {
-      // Ignored
-    } finally {
-      setIsSavingQuickCustomer(false);
     }
+    setIsSavingQuickCustomer(false);
   };
 
   const getPaymentIcon = (method: PaymentMethod) => {

@@ -1,0 +1,14 @@
+-- Reviewed concurrency protocol shared by the exact case bodies embedded in concurrency-runner.ps1.
+-- Each body uses SET statement_timeout='20s', lock_timeout='8s', idle_in_transaction_session_timeout='20s';
+-- records its real pg_backend_pid/application_name/barrier nonce; commits readiness; waits for the
+-- coordinator release. A is released first; only after the coordinator observes the production
+-- operation lock derived by hashtextextended(operation_id::text,2) is B released.
+-- The coordinator alone derives pg_blocking_pids(waiter), pg_locks blocker/waiter modes and the
+-- matching classid/objid. Sessions cannot assert their own overlap and the harness adds no lock.
+-- Executable cases invoke actual application RPCs:
+-- OPERATION_COLLISION_PENDING_FIRST: identity-begin RPC holds the operation lock; admission RPC conflicts.
+-- OPERATION_COLLISION_COMPLETED_FIRST: admission RPC holds the operation lock; identity-begin RPC conflicts.
+-- DURABLE_PENDING_RECOVERY is NOT IMPLEMENTED as concurrency proof because the recovery RPC has no
+-- observable application lock. RESERVATION_REVOCATION is BLOCKED pending a reviewed committed-fixture
+-- lifecycle. CONSUMPTION_REVOCATION is Auth-policy BLOCKED and has no direct-row substitute.
+-- REV-LIN-01 is intentionally absent: it remains policy-blocked and cannot be classified PASS.

@@ -92,7 +92,7 @@ export const canTransferStock = (role: string | null | undefined, permissions: s
   return permissions.includes('inventory.adjust') || permissions.includes('inventory.write');
 };
 
-export const InventoryView: React.FC = () => {
+export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutationsAllowed = true }) => {
   const { user, profile, pharmacy, branch, membership, role, permissions } = useAuth();
 
   // Network Connectivity State
@@ -287,21 +287,34 @@ export const InventoryView: React.FC = () => {
 
   // Permission: Cost Price Visibility & Stock Operations Authorization
   const canSeeCostPrice = canViewCostPrice(role, permissions);
-  const canReceiveStock = canPerformStockIntake(role, permissions);
-  const canAdjustStock = canAdjustInventory(role, permissions);
-  const canTransfer = canTransferStock(role, permissions);
-  const canManage = canManageCatalog(role, permissions);
+  const canReceiveStock = mutationsAllowed && canPerformStockIntake(role, permissions);
+  const canAdjustStock = mutationsAllowed && canAdjustInventory(role, permissions);
+  const canTransfer = mutationsAllowed && canTransferStock(role, permissions);
+  const canManage = mutationsAllowed && canManageCatalog(role, permissions);
+
+  useEffect(() => {
+    if (mutationsAllowed) return;
+    setIsStockIntakeOpen(false);
+    setIsStockAdjustmentOpen(false);
+    setIsStockTransferDispatchOpen(false);
+    setSelectedTransferForReceive(null);
+    setIsProductFormOpen(false);
+    setProductToEdit(null);
+    setActiveTab('catalog');
+  }, [mutationsAllowed]);
 
   // Master Product Catalog Form Handlers (Phase 5D-22)
   const handleOpenCreateProduct = useCallback(() => {
+    if (!mutationsAllowed) return;
     setProductToEdit(null);
     setIsProductFormOpen(true);
-  }, []);
+  }, [mutationsAllowed]);
 
   const handleOpenEditProduct = useCallback((prod: LocalProduct) => {
+    if (!mutationsAllowed) return;
     setProductToEdit(prod);
     setIsProductFormOpen(true);
-  }, []);
+  }, [mutationsAllowed]);
 
   const handleProductSaveSuccess = useCallback(async (savedProduct: LocalProduct) => {
     if (pharmacy?.id) {
@@ -313,7 +326,7 @@ export const InventoryView: React.FC = () => {
   }, [pharmacy?.id, loadLocalCatalog, searchQuery, selectedProduct]);
 
   const handleToggleProductStatus = useCallback(async (prod: LocalProduct) => {
-    if (!pharmacy?.id || isTogglingStatus) return;
+    if (!pharmacy?.id || isTogglingStatus || !mutationsAllowed) return;
     const newStatus = prod.status?.toUpperCase() === 'INACTIVE' ? 'ACTIVE' : 'INACTIVE';
     setIsTogglingStatus(true);
     setSyncErrorMessage(null);
@@ -333,7 +346,7 @@ export const InventoryView: React.FC = () => {
     } finally {
       setIsTogglingStatus(false);
     }
-  }, [pharmacy?.id, isTogglingStatus, selectedProduct, loadLocalCatalog, searchQuery]);
+  }, [pharmacy?.id, isTogglingStatus, selectedProduct, loadLocalCatalog, searchQuery, mutationsAllowed]);
 
   // Guard: No Active Pharmacy Selected
   if (!pharmacy || !user) {
@@ -350,6 +363,11 @@ export const InventoryView: React.FC = () => {
 
   return (
     <div className="w-full">
+      {!mutationsAllowed && (
+        <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200" role="status">
+          Inventory remains available for authorized inspection and read-model refresh. Product, stock, transfer, intake and adjustment mutations are disabled by subscription policy.
+        </div>
+      )}
       {/* Top Inventory Header with Status & Sync */}
       <InventoryHeader
         pharmacyName={pharmacy.name}
@@ -360,14 +378,19 @@ export const InventoryView: React.FC = () => {
         onSync={handleSync}
         totalProductsCount={products.length}
         canReceiveStock={canReceiveStock}
-        onOpenStockIntake={() => setIsStockIntakeOpen(true)}
+        onOpenStockIntake={() => {
+          if (mutationsAllowed) setIsStockIntakeOpen(true);
+        }}
         canAdjustStock={canAdjustStock}
         onOpenStockAdjustment={() => {
+          if (!mutationsAllowed) return;
           setAdjustmentTarget(null);
           setIsStockAdjustmentOpen(true);
         }}
         canTransferStock={canTransfer}
-        onOpenStockTransfer={() => setIsStockTransferDispatchOpen(true)}
+        onOpenStockTransfer={() => {
+          if (mutationsAllowed) setIsStockTransferDispatchOpen(true);
+        }}
         canManageCatalog={canManage}
         onOpenCreateProduct={handleOpenCreateProduct}
       />
@@ -430,9 +453,13 @@ export const InventoryView: React.FC = () => {
           branches={branches}
           canTransferStock={canTransfer}
           isOnline={onlineStatus}
-          onOpenDispatch={() => setIsStockTransferDispatchOpen(true)}
+          onOpenDispatch={() => {
+            if (mutationsAllowed) setIsStockTransferDispatchOpen(true);
+          }}
           onSelectTransferDetail={(transfer) => setSelectedTransferForDetail(transfer)}
-          onOpenReceive={(transfer) => setSelectedTransferForReceive(transfer)}
+          onOpenReceive={(transfer) => {
+            if (mutationsAllowed) setSelectedTransferForReceive(transfer);
+          }}
         />
       ) : (
         <ProductList
@@ -459,6 +486,7 @@ export const InventoryView: React.FC = () => {
           branchName={branch?.name || 'Main Branch'}
           canAdjustStock={canAdjustStock}
           onOpenStockAdjustment={(prodId, batchId) => {
+            if (!mutationsAllowed) return;
             setAdjustmentTarget({ productId: prodId, batchId });
             setIsStockAdjustmentOpen(true);
           }}
@@ -474,7 +502,7 @@ export const InventoryView: React.FC = () => {
       )}
 
       {/* Authoritative Stock Intake Modal (Phase 5D-15) */}
-      {isStockIntakeOpen && (
+      {mutationsAllowed && isStockIntakeOpen && (
         <StockIntakeModal
           pharmacyId={pharmacy.id}
           pharmacyName={pharmacy.name}
@@ -492,7 +520,7 @@ export const InventoryView: React.FC = () => {
       )}
 
       {/* Authoritative Stock Adjustment Modal (Phase 5D-16) */}
-      {isStockAdjustmentOpen && (
+      {mutationsAllowed && isStockAdjustmentOpen && (
         <StockAdjustmentModal
           pharmacyId={pharmacy.id}
           pharmacyName={pharmacy.name}
@@ -518,7 +546,7 @@ export const InventoryView: React.FC = () => {
       )}
 
       {/* Authoritative Stock Transfer Dispatch Modal (Phase 5D-18) */}
-      {isStockTransferDispatchOpen && (
+      {mutationsAllowed && isStockTransferDispatchOpen && (
         <StockTransferDispatchModal
           pharmacyId={pharmacy.id}
           pharmacyName={pharmacy.name}
@@ -547,12 +575,14 @@ export const InventoryView: React.FC = () => {
           userDefaultBranchId={membership?.default_branch_id || branch?.id}
           isOnline={onlineStatus}
           onClose={() => setSelectedTransferForDetail(null)}
-          onOpenReceive={(transfer) => setSelectedTransferForReceive(transfer)}
+          onOpenReceive={(transfer) => {
+            if (mutationsAllowed) setSelectedTransferForReceive(transfer);
+          }}
         />
       )}
 
       {/* Authoritative Stock Transfer Receive Modal (Phase 5D-18) */}
-      {selectedTransferForReceive && (
+      {mutationsAllowed && selectedTransferForReceive && (
         <StockTransferReceiveModal
           pharmacyId={pharmacy.id}
           transfer={selectedTransferForReceive}
@@ -568,7 +598,7 @@ export const InventoryView: React.FC = () => {
 
       {/* Master Product Catalog Form Modal (Phase 5D-22) */}
       <ProductFormModal
-        isOpen={isProductFormOpen}
+        isOpen={mutationsAllowed && isProductFormOpen}
         pharmacyId={pharmacy.id}
         currency={pharmacy.currency || 'NGN'}
         product={productToEdit}

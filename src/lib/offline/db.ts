@@ -10,13 +10,14 @@ import {
   SyncQueueItem,
   OperationResult,
   CreateTransactionParams,
-  TransactionStatus
+  TransactionStatus,
+  CheckoutDraft
 } from './types';
 import { canonicalizeJson, sha256Hex } from '../crypto/signing';
 import { getActiveDeviceIdentity } from '../crypto/deviceIdentity';
 
 const DB_NAME = 'pharmacyflow_offline_v1';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export const STORES = {
   TRANSACTIONS: 'local_transactions',
@@ -25,7 +26,8 @@ export const STORES = {
   PRODUCTS: 'products',
   BATCHES: 'inventory_batches',
   SNAPSHOT_METADATA: 'snapshot_metadata',
-  CUSTOMERS: 'customers'
+  CUSTOMERS: 'customers',
+  CHECKOUT_DRAFTS: 'checkout_drafts'
 } as const;
 
 let dbInstance: IDBDatabase | null = null;
@@ -56,7 +58,7 @@ export const setIdbFactory = (factory: IDBFactory | null): void => {
  * Opens or retrieves the shared IndexedDB connection.
  */
 export const openOfflineDb = async (customFactory?: IDBFactory): Promise<IDBDatabase> => {
-  if (dbInstance && !customFactory) {
+  if (dbInstance && (!customFactory || currentFactory === customFactory)) {
     return dbInstance;
   }
 
@@ -64,6 +66,7 @@ export const openOfflineDb = async (customFactory?: IDBFactory): Promise<IDBData
 
   return new Promise((resolve, reject) => {
     const request = factory.open(DB_NAME, DB_VERSION);
+    let upgradeBlocked = false;
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -130,11 +133,33 @@ export const openOfflineDb = async (customFactory?: IDBFactory): Promise<IDBData
         custStore.createIndex('pharmacy_phone', ['pharmacy_id', 'phone'], { unique: false });
         custStore.createIndex('pharmacy_name', ['pharmacy_id', 'name'], { unique: false });
       }
+
+      // v4 is strictly additive: historical v1-v3 records are not read or rewritten.
+      if (!db.objectStoreNames.contains(STORES.CHECKOUT_DRAFTS)) {
+        const draftStore = db.createObjectStore(STORES.CHECKOUT_DRAFTS, { keyPath: 'scope_key' });
+        draftStore.createIndex('pharmacy_id', 'pharmacy_id', { unique: false });
+        draftStore.createIndex('pharmacy_client_op', ['pharmacy_id', 'client_op_id'], { unique: true });
+        draftStore.createIndex('state', 'state', { unique: false });
+      }
     };
 
     request.onsuccess = () => {
+      if (upgradeBlocked) {
+        request.result.close();
+        return;
+      }
       dbInstance = request.result;
+      currentFactory = factory;
+      dbInstance.onversionchange = () => {
+        dbInstance?.close();
+        dbInstance = null;
+      };
       resolve(request.result);
+    };
+
+    request.onblocked = () => {
+      upgradeBlocked = true;
+      reject(new Error('IndexedDB v4 upgrade is blocked by another open PharmacyFlow tab; close or reload that tab and retry'));
     };
 
     request.onerror = () => {
@@ -151,6 +176,274 @@ export const closeOfflineDb = (): void => {
     dbInstance.close();
     dbInstance = null;
   }
+};
+
+export const checkoutScopeKey = (pharmacyId: string, branchId: string, cashierId: string): string =>
+  [pharmacyId, branchId, cashierId].map((value) => value.toLowerCase().trim()).join(':');
+
+export interface CheckoutDraftExpectation {
+  scope_key: string;
+  checkout_intent_id: string;
+  client_op_id: string;
+  sale_id: string;
+  expected_revision: number;
+}
+
+const matchesDraftIdentity = (draft: CheckoutDraft, expected: CheckoutDraftExpectation): boolean =>
+  draft.scope_key === expected.scope_key.toLowerCase().trim() &&
+  draft.checkout_intent_id === expected.checkout_intent_id.toLowerCase().trim() &&
+  draft.client_op_id === expected.client_op_id.toLowerCase().trim() &&
+  draft.sale_id === expected.sale_id.toLowerCase().trim();
+
+const snapshotMatchesDraft = (snapshot: Record<string, unknown>, draft: CheckoutDraft, revision: number): boolean =>
+  snapshot.checkout_scope_key === draft.scope_key && snapshot.checkout_intent_id === draft.checkout_intent_id &&
+  snapshot.client_op_id === draft.client_op_id && snapshot.sale_id === draft.sale_id &&
+  snapshot.pharmacy_id === draft.pharmacy_id && snapshot.branch_id === draft.branch_id &&
+  snapshot.cashier_id === draft.cashier_id && snapshot.client_created_at === draft.client_created_at &&
+  snapshot.draft_revision === revision;
+
+export const getCheckoutDraft = async (
+  scopeKey: string,
+  customFactory?: IDBFactory
+): Promise<CheckoutDraft | null> => {
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORES.CHECKOUT_DRAFTS, 'readonly')
+      .objectStore(STORES.CHECKOUT_DRAFTS).get(scopeKey.toLowerCase().trim());
+    request.onsuccess = () => resolve((request.result as CheckoutDraft | undefined) || null);
+    request.onerror = () => reject(new Error(`Failed to read checkout draft: ${request.error?.message}`));
+  });
+};
+
+/** Serializes competing tabs on the scope primary key and reserves every checkout identity once. */
+export const getOrCreateCheckoutDraft = async (
+  scope: { pharmacy_id: string; branch_id: string; cashier_id: string },
+  customFactory?: IDBFactory
+): Promise<CheckoutDraft> => {
+  const pharmacyId = scope.pharmacy_id.toLowerCase().trim();
+  const branchId = scope.branch_id.toLowerCase().trim();
+  const cashierId = scope.cashier_id.toLowerCase().trim();
+  const scopeKey = checkoutScopeKey(pharmacyId, branchId, cashierId);
+  const db = await openOfflineDb(customFactory);
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.CHECKOUT_DRAFTS, 'readwrite');
+    const store = tx.objectStore(STORES.CHECKOUT_DRAFTS);
+    const request = store.get(scopeKey);
+    let selected: CheckoutDraft;
+    request.onsuccess = () => {
+      const existing = request.result as CheckoutDraft | undefined;
+      if (existing && (existing.state === 'DRAFT' || existing.state === 'LOCALLY_DURABLE')) {
+        selected = existing;
+        return;
+      }
+      const now = Date.now();
+      selected = {
+        scope_key: scopeKey,
+        pharmacy_id: pharmacyId,
+        branch_id: branchId,
+        cashier_id: cashierId,
+        checkout_intent_id: crypto.randomUUID().toLowerCase(),
+        client_op_id: crypto.randomUUID().toLowerCase(),
+        sale_id: crypto.randomUUID().toLowerCase(),
+        client_created_at: now,
+        state: 'DRAFT',
+        cart_snapshot: null,
+        frozen_payload: null,
+        payload_hash: null,
+        transaction_id: null,
+        queue_id: null,
+        created_at: now,
+        updated_at: now,
+        revision: 0
+      };
+      store.put(selected);
+    };
+    tx.oncomplete = () => resolve(selected!);
+    tx.onerror = () => reject(new Error(`Failed to reserve checkout draft: ${tx.error?.message}`));
+    tx.onabort = () => reject(new Error(`Checkout draft reservation aborted: ${tx.error?.message}`));
+  });
+};
+
+export const ensureCheckoutDraft = async (
+  requested: CheckoutDraft,
+  customFactory?: IDBFactory
+): Promise<CheckoutDraft> => {
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.CHECKOUT_DRAFTS, 'readwrite');
+    const store = tx.objectStore(STORES.CHECKOUT_DRAFTS);
+    const normalizedScope = checkoutScopeKey(requested.pharmacy_id, requested.branch_id, requested.cashier_id);
+    const request = store.get(normalizedScope);
+    let selected: CheckoutDraft;
+    request.onsuccess = () => {
+      if (requested.scope_key !== normalizedScope || requested.revision < 0 ||
+          (requested.cart_snapshot && !snapshotMatchesDraft(requested.cart_snapshot, requested, requested.revision))) {
+        tx.abort(); return;
+      }
+      const existing = request.result as CheckoutDraft | undefined;
+      if (existing) {
+        if (existing.client_op_id !== requested.client_op_id || existing.checkout_intent_id !== requested.checkout_intent_id ||
+            existing.sale_id !== requested.sale_id || existing.client_created_at !== requested.client_created_at ||
+            existing.pharmacy_id !== requested.pharmacy_id || existing.branch_id !== requested.branch_id ||
+            existing.cashier_id !== requested.cashier_id) {
+          tx.abort(); return;
+        }
+        selected = existing;
+      } else {
+        selected = structuredClone(requested);
+        store.add(selected);
+      }
+    };
+    tx.oncomplete = () => resolve(selected!);
+    tx.onerror = () => reject(new Error(`Failed to ensure checkout draft: ${tx.error?.message}`));
+    tx.onabort = () => reject(new Error('Checkout scope is already owned by another durable checkout'));
+  });
+};
+
+export const saveCheckoutDraftSnapshot = async (
+  expected: CheckoutDraftExpectation,
+  snapshot: Record<string, unknown>,
+  customFactory?: IDBFactory
+): Promise<CheckoutDraft> => {
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.CHECKOUT_DRAFTS, 'readwrite');
+    const store = tx.objectStore(STORES.CHECKOUT_DRAFTS);
+    const request = store.get(expected.scope_key.toLowerCase().trim());
+    let updated: CheckoutDraft;
+    request.onsuccess = () => {
+      const draft = request.result as CheckoutDraft | undefined;
+      if (!draft || !matchesDraftIdentity(draft, expected) || draft.revision !== expected.expected_revision ||
+          draft.state !== 'DRAFT' || !snapshotMatchesDraft(snapshot, draft, expected.expected_revision)) { tx.abort(); return; }
+      const revision = draft.revision + 1;
+      const nextSnapshot = { ...structuredClone(snapshot), draft_revision: revision };
+      updated = { ...draft, cart_snapshot: nextSnapshot, updated_at: Date.now(), revision };
+      store.put(updated);
+    };
+    tx.oncomplete = () => resolve(updated!);
+    tx.onerror = () => reject(new Error(`Failed to save checkout draft: ${tx.error?.message}`));
+    tx.onabort = () => reject(new Error('STALE_CHECKOUT_DRAFT: snapshot identity or revision no longer owns this scope'));
+  });
+};
+
+export const cancelCheckoutDraft = async (expected: CheckoutDraftExpectation, customFactory?: IDBFactory): Promise<void> => {
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.CHECKOUT_DRAFTS, 'readwrite');
+    const store = tx.objectStore(STORES.CHECKOUT_DRAFTS);
+    const request = store.get(expected.scope_key.toLowerCase().trim());
+    request.onsuccess = () => {
+      const draft = request.result as CheckoutDraft | undefined;
+      if (!draft || !matchesDraftIdentity(draft, expected) || draft.revision !== expected.expected_revision || draft.state !== 'DRAFT') { tx.abort(); return; }
+      store.put({ ...draft, state: 'CANCELLED', cart_snapshot: null, updated_at: Date.now(), revision: draft.revision + 1 });
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(new Error(`Failed to cancel checkout draft: ${tx.error?.message}`));
+    tx.onabort = () => reject(new Error('STALE_CHECKOUT_DRAFT: checkout cannot be cancelled by this caller'));
+  });
+};
+
+export const acknowledgeCheckoutDraft = async (expected: CheckoutDraftExpectation, customFactory?: IDBFactory): Promise<void> => {
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORES.CHECKOUT_DRAFTS, STORES.TRANSACTIONS, STORES.QUEUE], 'readwrite');
+    const drafts = tx.objectStore(STORES.CHECKOUT_DRAFTS);
+    const request = drafts.get(expected.scope_key.toLowerCase().trim());
+    request.onsuccess = () => {
+      const draft = request.result as CheckoutDraft | undefined;
+      if (!draft || !matchesDraftIdentity(draft, expected) || draft.revision !== expected.expected_revision ||
+          draft.state !== 'LOCALLY_DURABLE' || !draft.transaction_id || !draft.queue_id) { tx.abort(); return; }
+      // Retire only the UI ownership pointer. Immutable transaction/queue records are untouched.
+      drafts.put({ ...draft, state: 'ACKNOWLEDGED', cart_snapshot: null, updated_at: Date.now(), revision: draft.revision + 1 });
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(new Error(`Failed to acknowledge checkout draft: ${tx.error?.message}`));
+    tx.onabort = () => reject(new Error('STALE_CHECKOUT_DRAFT: durable checkout cannot be acknowledged by this caller'));
+  });
+};
+
+/** Freezes the first payload and atomically writes draft, local transaction and queue. */
+export const freezeCheckoutDraftTransaction = async (
+  expected: CheckoutDraftExpectation,
+  payload: Record<string, unknown>,
+  customFactory?: IDBFactory
+): Promise<{ transaction: LocalTransaction; queueItem: SyncQueueItem; draft: CheckoutDraft; created: boolean }> => {
+  const canonicalPayload = canonicalizeJson(payload);
+  const payloadHash = await sha256Hex(canonicalPayload);
+  const frozenPayload = JSON.parse(canonicalPayload) as Record<string, unknown>;
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORES.CHECKOUT_DRAFTS, STORES.TRANSACTIONS, STORES.QUEUE], 'readwrite');
+    const drafts = tx.objectStore(STORES.CHECKOUT_DRAFTS);
+    const transactions = tx.objectStore(STORES.TRANSACTIONS);
+    const queue = tx.objectStore(STORES.QUEUE);
+    const request = drafts.get(expected.scope_key.toLowerCase().trim());
+    let result: { transaction: LocalTransaction; queueItem: SyncQueueItem; draft: CheckoutDraft; created: boolean };
+    let abortReason = 'Checkout payload conflicts with its first durable identity or payload';
+    request.onsuccess = () => {
+      const draft = request.result as CheckoutDraft | undefined;
+      if (!draft || !matchesDraftIdentity(draft, expected)) {
+        abortReason = 'STALE_CHECKOUT_DRAFT: checkout ownership is missing or replaced';
+        tx.abort(); return;
+      }
+      if (draft.state === 'LOCALLY_DURABLE') {
+        const txReq = transactions.get(draft.transaction_id!);
+        const queueReq = queue.get(draft.queue_id!);
+        let existingTx: LocalTransaction | undefined;
+        let existingQueue: SyncQueueItem | undefined;
+        let completedReads = 0;
+        const finishRead = () => {
+          completedReads++;
+          if (completedReads < 2) return;
+          if (!existingTx || !existingQueue || existingTx.client_op_id !== draft.client_op_id ||
+              existingQueue.client_op_id !== draft.client_op_id || existingTx.payload_hash !== draft.payload_hash ||
+              canonicalizeJson(existingTx.payload) !== canonicalizeJson(draft.frozen_payload)) {
+            abortReason = 'Existing durable checkout evidence is incomplete or inconsistent';
+            tx.abort(); return;
+          }
+          result = { transaction: existingTx, queueItem: existingQueue, draft, created: false };
+        };
+        txReq.onsuccess = () => { existingTx = txReq.result as LocalTransaction | undefined; finishRead(); };
+        queueReq.onsuccess = () => { existingQueue = queueReq.result as SyncQueueItem | undefined; finishRead(); };
+        txReq.onerror = queueReq.onerror = () => tx.abort();
+        return;
+      }
+      if (draft.state !== 'DRAFT') {
+        abortReason = `RETIRED_CHECKOUT_DRAFT: ${draft.state} checkout cannot be frozen`;
+        tx.abort(); return;
+      }
+      if (draft.revision !== expected.expected_revision) { tx.abort(); return; }
+      const identitiesMatch = frozenPayload.client_op_id === draft.client_op_id &&
+        frozenPayload.checkout_intent_id === draft.checkout_intent_id && frozenPayload.sale_id === draft.sale_id &&
+        frozenPayload.pharmacy_id === draft.pharmacy_id && frozenPayload.branch_id === draft.branch_id &&
+        frozenPayload.cashier_id === draft.cashier_id && frozenPayload.created_at === draft.client_created_at;
+      if (!identitiesMatch) { tx.abort(); return; }
+      const now = Date.now();
+      const transaction: LocalTransaction = {
+        id: crypto.randomUUID().toLowerCase(), pharmacy_id: draft.pharmacy_id, client_op_id: draft.client_op_id,
+        transaction_type: 'SALE_STOCK_MOVEMENT', payload: frozenPayload, payload_hash: payloadHash,
+        created_at: now, updated_at: now, status: 'PENDING'
+      };
+      const queueItem: SyncQueueItem = {
+        id: crypto.randomUUID().toLowerCase(), pharmacy_id: draft.pharmacy_id, client_op_id: draft.client_op_id,
+        status: 'PENDING', attempts: 0, next_attempt_at: now, last_attempt_at: null, last_error: null,
+        created_at: now, updated_at: now, locked_at: null, revision: 0, lease_token: null
+      };
+      const nextRevision = draft.revision + 1;
+      const frozenSnapshot = draft.cart_snapshot ? { ...draft.cart_snapshot, draft_revision: nextRevision } : null;
+      const updatedDraft: CheckoutDraft = {
+        ...draft, state: 'LOCALLY_DURABLE', frozen_payload: frozenPayload, payload_hash: payloadHash,
+        transaction_id: transaction.id, queue_id: queueItem.id, cart_snapshot: frozenSnapshot, updated_at: now,
+        revision: nextRevision
+      };
+      transactions.add(transaction); queue.add(queueItem); drafts.put(updatedDraft);
+      result = { transaction, queueItem, draft: updatedDraft, created: true };
+    };
+    tx.oncomplete = () => resolve(result!);
+    tx.onerror = () => reject(new Error(`Atomic checkout persistence failed: ${tx.error?.message}`));
+    tx.onabort = () => reject(new Error(abortReason));
+  });
 };
 
 /**
@@ -191,7 +484,9 @@ export const createLocalTransaction = async (
     last_error: null,
     created_at: now,
     updated_at: now,
-    locked_at: null
+    locked_at: null,
+    revision: 0,
+    lease_token: null
   };
 
   const db = await openOfflineDb(customFactory);
@@ -360,7 +655,7 @@ export const getQueueItem = async (
 
 export interface LeaseAcquisitionResult {
   acquired: boolean;
-  reason?: 'SUCCESS' | 'LEASE_ACTIVE' | 'TERMINAL_STATE' | 'NOT_FOUND' | 'UNAUTHORIZED_PHARMACY' | 'NOT_ELIGIBLE';
+  reason?: 'SUCCESS' | 'RECONCILIATION_REQUIRED' | 'TERMINAL_STATE' | 'NOT_FOUND' | 'UNAUTHORIZED_PHARMACY' | 'NOT_ELIGIBLE';
   item?: SyncQueueItem;
 }
 
@@ -390,35 +685,37 @@ export const acquireQueueLease = async (
     const index = store.index('pharmacy_client_op');
     const req = index.get([normPharmacy, normOp]);
 
+    let outcome: LeaseAcquisitionResult | undefined;
+    let requestFailure: Error | null = null;
     req.onsuccess = () => {
       const item = req.result as SyncQueueItem | undefined;
       if (!item) {
-        resolve({ acquired: false, reason: 'NOT_FOUND' });
+        outcome = { acquired: false, reason: 'NOT_FOUND' };
         return;
       }
 
       if (item.pharmacy_id !== normPharmacy) {
-        resolve({ acquired: false, reason: 'UNAUTHORIZED_PHARMACY' });
+        outcome = { acquired: false, reason: 'UNAUTHORIZED_PHARMACY' };
         return;
       }
 
       // Check terminal states
       if (item.status === 'COMMITTED' || item.status === 'PERMANENT_FAILURE') {
-        resolve({ acquired: false, reason: 'TERMINAL_STATE', item });
+        outcome = { acquired: false, reason: 'TERMINAL_STATE', item };
         return;
       }
 
       const now = Date.now();
 
-      // Check if another tab/worker currently holds an active (unexpired) lease
-      if (item.status === 'SYNCING' && item.locked_at !== null && (now - item.locked_at < leaseTimeoutMs)) {
-        resolve({ acquired: false, reason: 'LEASE_ACTIVE', item });
+      // A SYNCING operation may already have committed remotely. Expiry never authorizes resend.
+      if (item.status === 'SYNCING') {
+        outcome = { acquired: false, reason: 'RECONCILIATION_REQUIRED', item };
         return;
       }
 
-      // Check eligibility: PENDING, RETRYABLE, or stale SYNCING (lease expired)
-      if (item.status !== 'PENDING' && item.status !== 'RETRYABLE' && item.status !== 'SYNCING') {
-        resolve({ acquired: false, reason: 'NOT_ELIGIBLE', item });
+      // Only authoritative PENDING/RETRYABLE states are eligible to transmit.
+      if (item.status !== 'PENDING' && item.status !== 'RETRYABLE') {
+        outcome = { acquired: false, reason: 'NOT_ELIGIBLE', item };
         return;
       }
 
@@ -429,16 +726,24 @@ export const acquireQueueLease = async (
         attempts: item.attempts + 1,
         last_attempt_at: now,
         locked_at: now,
-        updated_at: now
+        updated_at: now,
+        revision: (item.revision || 0) + 1,
+        lease_token: crypto.randomUUID().toLowerCase()
       };
 
       store.put(updatedItem);
-      resolve({ acquired: true, reason: 'SUCCESS', item: updatedItem });
+      outcome = { acquired: true, reason: 'SUCCESS', item: updatedItem };
     };
 
     req.onerror = () => {
-      reject(new Error(`Failed to acquire queue lease: ${req.error?.message}`));
+      requestFailure = new Error(`Failed to acquire queue lease: ${req.error?.message || 'request failed'}`);
+      tx.abort();
     };
+    tx.oncomplete = () => outcome
+      ? resolve(outcome)
+      : reject(new Error('Failed to acquire queue lease: transaction completed without a result'));
+    tx.onerror = () => reject(requestFailure || new Error(`Failed to acquire queue lease: ${tx.error?.message || 'transaction failed'}`));
+    tx.onabort = () => reject(requestFailure || new Error(`Queue lease transaction aborted: ${tx.error?.message || 'persistence was not committed'}`));
   });
 };
 
@@ -496,6 +801,136 @@ export const updateQueueItem = async (
 
     req.onsuccess = () => resolve();
     req.onerror = () => reject(new Error(`Failed to update queue item: ${req.error?.message}`));
+  });
+};
+
+export const getQueueItemsByStates = async (
+  pharmacyId: string,
+  states: readonly SyncQueueItem['status'][],
+  customFactory?: IDBFactory
+): Promise<SyncQueueItem[]> => {
+  const normPharmacy = pharmacyId.toLowerCase().trim();
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORES.QUEUE, 'readonly').objectStore(STORES.QUEUE)
+      .index('pharmacy_id').getAll(normPharmacy);
+    request.onsuccess = () => resolve(((request.result || []) as SyncQueueItem[])
+      .filter((item) => item.pharmacy_id === normPharmacy && states.includes(item.status)));
+    request.onerror = () => reject(new Error(`Failed to read reconciliation queue: ${request.error?.message}`));
+  });
+};
+
+/** Quarantines a queue orphan with CAS; this never fabricates a missing transaction/result. */
+export const quarantineOrphanQueueItem = async (
+  pharmacyId: string,
+  clientOpId: string,
+  expected: { status: SyncQueueItem['status']; revision: number; lease_token: string | null },
+  error: string,
+  customFactory?: IDBFactory
+): Promise<void> => {
+  const normPharmacy = pharmacyId.toLowerCase().trim();
+  const normOp = clientOpId.toLowerCase().trim();
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES.QUEUE, 'readwrite');
+    const store = tx.objectStore(STORES.QUEUE);
+    const request = store.index('pharmacy_client_op').get([normPharmacy, normOp]);
+    let abortReason = 'STALE_OPERATION_RESOLUTION: orphan queue state changed';
+    request.onsuccess = () => {
+      const queued = request.result as SyncQueueItem | undefined;
+      if (!queued || queued.pharmacy_id !== normPharmacy) {
+        abortReason = `Operation ${normOp} has no queue record`;
+        tx.abort(); return;
+      }
+      if (queued.status !== expected.status || (queued.revision || 0) !== expected.revision ||
+          (queued.lease_token || null) !== expected.lease_token) { tx.abort(); return; }
+      store.put({ ...queued, status: 'RECOVERY_REQUIRED', last_error: error, locked_at: null,
+        lease_token: null, revision: (queued.revision || 0) + 1, updated_at: Date.now() });
+    };
+    request.onerror = () => tx.abort();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(new Error(`Queue orphan quarantine failed: ${tx.error?.message}`));
+    tx.onabort = () => reject(new Error(abortReason));
+  });
+};
+
+/** Commits the validated server resolution and all local projections in one IDB transaction. */
+export const resolveOperationAtomically = async (
+  pharmacyId: string,
+  clientOpId: string,
+  update: {
+    queue_status: SyncQueueItem['status'];
+    transaction_status: TransactionStatus;
+    error?: string | null;
+    next_attempt_at?: number;
+    increment_reconciliation?: boolean;
+    result?: Omit<OperationResult, 'id'>;
+    expected_queue_statuses: readonly SyncQueueItem['status'][];
+    expected_revision: number;
+    expected_lease_token?: string | null;
+  },
+  customFactory?: IDBFactory
+): Promise<void> => {
+  const normPharmacy = pharmacyId.toLowerCase().trim();
+  const normOp = clientOpId.toLowerCase().trim();
+  const db = await openOfflineDb(customFactory);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORES.TRANSACTIONS, STORES.QUEUE, STORES.RESULTS], 'readwrite');
+    const txStore = tx.objectStore(STORES.TRANSACTIONS);
+    const queueStore = tx.objectStore(STORES.QUEUE);
+    const resultStore = tx.objectStore(STORES.RESULTS);
+    const txRequest = txStore.index('pharmacy_client_op').get([normPharmacy, normOp]);
+    const queueRequest = queueStore.index('pharmacy_client_op').get([normPharmacy, normOp]);
+    let local: LocalTransaction | undefined;
+    let queued: SyncQueueItem | undefined;
+    let reads = 0;
+    let wrote = false;
+    let abortReason = `Operation ${normOp} is incomplete in local storage`;
+    const terminal = new Set<SyncQueueItem['status']>(['COMMITTED', 'CONFLICT', 'RECOVERY_REQUIRED', 'PERMANENT_FAILURE']);
+    const write = () => {
+      reads++;
+      if (reads < 2 || wrote) return;
+      if (!local || !queued || local.pharmacy_id !== normPharmacy || queued.pharmacy_id !== normPharmacy ||
+          !update.expected_queue_statuses.includes(queued.status) || (queued.revision || 0) !== update.expected_revision ||
+          (update.expected_lease_token !== undefined && (queued.lease_token || null) !== update.expected_lease_token) ||
+          (terminal.has(queued.status) && queued.status !== update.queue_status)) {
+        if (local && queued) abortReason = 'STALE_OPERATION_RESOLUTION: queue state, revision, lease or terminal outcome changed';
+        tx.abort(); return;
+      }
+      if (update.result && (update.result.pharmacy_id !== normPharmacy || update.result.client_op_id !== normOp ||
+          (update.result.payload_hash !== undefined && update.result.payload_hash !== local.payload_hash))) {
+        abortReason = 'INVALID_OPERATION_RESULT: result identity or payload hash does not match local operation';
+        tx.abort(); return;
+      }
+      wrote = true;
+      // Terminal outcomes are immutable. An exact repeated resolution is an idempotent no-op.
+      if (terminal.has(queued.status)) return;
+      const now = Date.now();
+      const persist = (existingResult?: OperationResult) => {
+        txStore.put({ ...local!, status: update.transaction_status, updated_at: now });
+        queueStore.put({
+          ...queued!, status: update.queue_status, last_error: update.error === undefined ? queued!.last_error : update.error,
+          next_attempt_at: update.next_attempt_at === undefined ? queued!.next_attempt_at : update.next_attempt_at,
+          reconciliation_attempts: update.increment_reconciliation
+            ? (queued!.reconciliation_attempts || 0) + 1 : queued!.reconciliation_attempts,
+          locked_at: null, lease_token: null, revision: (queued!.revision || 0) + 1, updated_at: now
+        });
+        if (update.result) resultStore.put({
+          ...update.result,
+          id: existingResult?.id || crypto.randomUUID().toLowerCase()
+        });
+      };
+      if (!update.result) { persist(); return; }
+      const resultRequest = resultStore.index('pharmacy_client_op').get([normPharmacy, normOp]);
+      resultRequest.onsuccess = () => persist(resultRequest.result as OperationResult | undefined);
+      resultRequest.onerror = () => tx.abort();
+    };
+    txRequest.onsuccess = () => { local = txRequest.result as LocalTransaction | undefined; write(); };
+    queueRequest.onsuccess = () => { queued = queueRequest.result as SyncQueueItem | undefined; write(); };
+    txRequest.onerror = queueRequest.onerror = () => tx.abort();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(new Error(`Atomic operation resolution failed: ${tx.error?.message}`));
+    tx.onabort = () => reject(new Error(abortReason));
   });
 };
 
@@ -571,7 +1006,8 @@ export const clearPharmacyOfflineData = async (
         STORES.PRODUCTS,
         STORES.BATCHES,
         STORES.SNAPSHOT_METADATA,
-        STORES.CUSTOMERS
+        STORES.CUSTOMERS,
+        STORES.CHECKOUT_DRAFTS
       ],
       'readwrite'
     );
@@ -592,6 +1028,7 @@ export const clearPharmacyOfflineData = async (
     deleteFromStore(STORES.PRODUCTS);
     deleteFromStore(STORES.BATCHES);
     deleteFromStore(STORES.CUSTOMERS);
+    deleteFromStore(STORES.CHECKOUT_DRAFTS);
 
     // Delete snapshot metadata (keyed by pharmacy_id)
     tx.objectStore(STORES.SNAPSHOT_METADATA).delete(normPharmacy);
@@ -898,5 +1335,3 @@ export const countUnresolvedQueueOperations = async (
   );
   return unresolved.length;
 };
-
-

@@ -41,12 +41,13 @@ import {
   rotateDeviceKeyModelB
 } from '../../lib/devices/index';
 import { Branch } from '../../types/database';
+import { CapabilityAsyncBoundary } from '../../lib/subscription/capabilityBoundary';
 
-export const DeviceManagementView: React.FC = () => {
+export const DeviceManagementView: React.FC<{ enrollmentAllowed?: boolean }> = ({ enrollmentAllowed = true }) => {
   const { user, pharmacy, branch, role, permissions } = useAuth();
 
   // Role permissions
-  const canEnroll = role === 'OWNER' || role === 'MANAGER' || permissions.includes('device.enroll');
+  const canEnroll = enrollmentAllowed && (role === 'OWNER' || role === 'MANAGER' || permissions.includes('device.enroll'));
   const canBlock = role === 'OWNER' || role === 'MANAGER' || permissions.includes('device.block');
   const canDelete = role === 'OWNER';
 
@@ -82,6 +83,7 @@ export const DeviceManagementView: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<Device | null>(null);
 
   const activePharmacyIdRef = useRef<string | null>(null);
+  const enrollmentBoundaryRef = useRef(new CapabilityAsyncBoundary('', enrollmentAllowed));
 
   // 1. Load Data
   const loadData = useCallback(async () => {
@@ -125,6 +127,19 @@ export const DeviceManagementView: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (enrollmentBoundaryRef.current.update(pharmacy?.id || '', enrollmentAllowed)) {
+      setIsEnrolling(false);
+      setIsRotating(false);
+      setActionLoadingId(null);
+    }
+    if (enrollmentAllowed) return;
+    setIsEnrollModalOpen(false);
+    setRotateKeyTarget(null);
+  }, [pharmacy?.id, enrollmentAllowed]);
+
+  useEffect(() => () => enrollmentBoundaryRef.current.invalidate(), []);
 
   // Filtered devices
   const filteredDevices = devices.filter((d) => {
@@ -185,7 +200,8 @@ export const DeviceManagementView: React.FC = () => {
   // Actions
   const handleEnrollSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pharmacy?.id || !user?.id || !canEnroll) return;
+    const mutationToken = enrollmentBoundaryRef.current.begin();
+    if (!pharmacy?.id || !user?.id || !canEnroll || !mutationToken) return;
     if (!enrollName.trim()) {
       setErrorMessage('Device name is required');
       return;
@@ -208,6 +224,7 @@ export const DeviceManagementView: React.FC = () => {
         platform: enrollPlatform,
         isCurrentTerminal: enrollIsThisWorkstation
       });
+      if (!enrollmentBoundaryRef.current.accepts(mutationToken)) return;
 
       if (!result.success) {
         setErrorMessage(result.error || 'Failed to enroll device');
@@ -219,9 +236,10 @@ export const DeviceManagementView: React.FC = () => {
       setEnrollName('');
       await loadData();
     } catch (err: unknown) {
+      if (!enrollmentBoundaryRef.current.accepts(mutationToken)) return;
       setErrorMessage(err instanceof Error ? err.message : 'Unexpected enrollment error');
     } finally {
-      setIsEnrolling(false);
+      if (enrollmentBoundaryRef.current.accepts(mutationToken)) setIsEnrolling(false);
     }
   };
 
@@ -298,7 +316,8 @@ export const DeviceManagementView: React.FC = () => {
 
   const handleRotateKeyConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pharmacy?.id || !user?.id || !rotateKeyTarget || !canEnroll) return;
+    const mutationToken = enrollmentBoundaryRef.current.begin();
+    if (!pharmacy?.id || !user?.id || !rotateKeyTarget || !canEnroll || !mutationToken) return;
     if (!rotateName.trim()) {
       setErrorMessage('Replacement device name is required');
       return;
@@ -328,6 +347,7 @@ export const DeviceManagementView: React.FC = () => {
         newDeviceName: rotateName.trim(),
         platform: rotatePlatform
       });
+      if (!enrollmentBoundaryRef.current.accepts(mutationToken)) return;
 
       if (!result.success) {
         setErrorMessage(result.error || 'Key rotation failed');
@@ -339,9 +359,10 @@ export const DeviceManagementView: React.FC = () => {
       setRotateName('');
       await loadData();
     } catch (err: unknown) {
+      if (!enrollmentBoundaryRef.current.accepts(mutationToken)) return;
       setErrorMessage(err instanceof Error ? err.message : 'Rotation action failed');
     } finally {
-      setIsRotating(false);
+      if (enrollmentBoundaryRef.current.accepts(mutationToken)) setIsRotating(false);
     }
   };
 
@@ -373,6 +394,11 @@ export const DeviceManagementView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {!enrollmentAllowed && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200" role="status">
+          Advisory subscription containment: new device enrollment and replacement-key enrollment are disabled. Device history and existing security/recovery controls retain their existing role authorization.
+        </div>
+      )}
       {/* 1. Header Banner */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-900/90 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
@@ -771,7 +797,7 @@ export const DeviceManagementView: React.FC = () => {
       {/* 5. MODALS */}
 
       {/* 5.1 Enrollment Modal */}
-      {isEnrollModalOpen && (
+      {enrollmentAllowed && isEnrollModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -1002,7 +1028,7 @@ export const DeviceManagementView: React.FC = () => {
       )}
 
       {/* 5.3 Model B Key Rotation Modal */}
-      {rotateKeyTarget && (
+      {enrollmentAllowed && rotateKeyTarget && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">

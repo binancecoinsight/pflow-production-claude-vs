@@ -7,7 +7,8 @@ import {
   removeCartItem,
   clearCart,
   finalizePosSale,
-  checkCatalogFreshness
+  checkCatalogFreshness,
+  loadOrCreateDurableCart
 } from '../../lib/pos/index';
 import {
   replacePharmacyInventorySnapshot,
@@ -285,11 +286,9 @@ async function runPosUiTestSuite() {
   console.log('\n[6. Complete Sale Flow & Offline Durability]');
 
   // Re-populate cart with 2 items for Pharmacy A
-  let saleCart = createCartFromSession({
-    user: { id: userA },
-    pharmacy: { id: pharmacyA },
-    branch: { id: branchA }
-  });
+  let saleCart = await loadOrCreateDurableCart({
+    pharmacy_id: pharmacyA, branch_id: branchA, cashier_id: userA, authenticated_user_id: userA, currency: 'NGN'
+  }, indexedDB);
   saleCart = await addItemToCart(saleCart, { product_id: prodA1, quantity: 2 }, indexedDB); // 3000
   saleCart = await addItemToCart(saleCart, { product_id: prodA2, quantity: 1 }, indexedDB); // 3200
   assert(saleCart.total === 6200, 'Sale cart total is 6200');
@@ -341,15 +340,16 @@ async function runPosUiTestSuite() {
     { payment_method: 'CARD', client_op_id: explicitOpId, authenticated_user_id: userA },
     indexedDB
   );
-  assert(firstSubmission.success === true, 'First submission with client_op_id succeeded');
+  assert(firstSubmission.success === false, 'Caller cannot replace the checkout-reserved client_op_id');
 
-  // Duplicate finalization with the same client_op_id is rejected by idempotency guard
+  // Repeating the reserved checkout retrieves the already durable operation.
   const duplicateSubmission = await finalizePosSale(
     saleCart,
-    { payment_method: 'CARD', client_op_id: explicitOpId, authenticated_user_id: userA },
+    { payment_method: 'CARD', client_op_id: saleCart.client_op_id, authenticated_user_id: userA },
     indexedDB
   );
-  assert(duplicateSubmission.success === false, 'Duplicate submission with same client_op_id is rejected');
+  assert(duplicateSubmission.success === true && duplicateSubmission.transaction?.id === finalizationResult.transaction?.id,
+    'Retry retrieves the first durable checkout operation without duplication');
 
   // --- 8. CATALOG FRESHNESS INDICATOR ---
   console.log('\n[8. Catalog Freshness Verification]');

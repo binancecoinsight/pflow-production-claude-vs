@@ -1,0 +1,29 @@
+{
+  "status": "NOT_AUTHORIZED",
+  "note": "Schema illustration only. Missing proof values and hashes intentionally prevent execution.",
+  "authorizationId": "OWNER-MUST-SUPPLY",
+  "scope": "I3A_DISPOSABLE_POSTGRES_ACCEPTANCE",
+  "target": {
+    "projectId": "pharmacyflow-i3a-acceptance-20261026",
+    "marker": "pharmacyflow-i3a-acceptance-20261026",
+    "host": "127.0.0.1",
+    "port": 57322,
+    "database": "postgres",
+    "user": "postgres",
+    "sslMode": "disable",
+    "systemIdentifier": "OWNER-MUST-SUPPLY",
+    "databaseOid": 0
+  },
+  "connection": {
+    "psqlPath": "OWNER-MUST-SUPPLY",
+    "psqlSha256": "OWNER-MUST-SUPPLY",
+    "credentialFilePath": "OWNER-MUST-SUPPLY",
+    "connectTimeoutSeconds": 5
+  },
+  "allowedCommands": [],
+  "commandPermissions": {},
+  "approvedHashes": {},
+  "packageManifestSha256": "OWNER-MUST-SUPPLY",
+  "providerAuthBrowserEnabled": false,
+  "expiresAt": "OWNER-MUST-SUPPLY"
+}

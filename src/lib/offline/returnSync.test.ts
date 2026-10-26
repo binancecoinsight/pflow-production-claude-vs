@@ -105,8 +105,10 @@ async function runReturnSyncTests() {
     return new Response(
       JSON.stringify({
         status: 'COMMITTED',
+        client_op_id: transaction.client_op_id,
         return_id: 'ret-authoritative-uuid',
-        refund_amount: 5000
+        refund_amount: 5000,
+        processed_at: new Date().toISOString()
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
@@ -182,8 +184,8 @@ async function runReturnSyncTests() {
 
   const failedTx = await getLocalTransaction(pharmacyId, tx2.client_op_id, indexedDB);
   const failedQueue = await getQueueItem(pharmacyId, tx2.client_op_id, indexedDB);
-  assert(failedTx?.status === 'PERMANENT_FAILURE', 'HTTP 409 transitions transaction to PERMANENT_FAILURE');
-  assert(failedQueue?.status === 'PERMANENT_FAILURE', 'HTTP 409 transitions queue item to PERMANENT_FAILURE');
+  assert(failedTx?.status === 'CONFLICT', 'Untyped HTTP 409 is quarantined as CONFLICT');
+  assert(failedQueue?.status === 'CONFLICT', 'Untyped HTTP 409 queue item is quarantined as CONFLICT');
 
   console.log(`\n======================================================`);
   console.log(`PHASE 5D-11 OFFLINE RETURN TESTS: ${passed} PASSED, ${failed} FAILED`);

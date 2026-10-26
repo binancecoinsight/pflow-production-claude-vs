@@ -1,9 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Building2, LogOut, RefreshCw, ShieldAlert } from 'lucide-react';
+import { StaffInvitationForm } from './StaffInvitationForm';
+import { readOwnerOnboardingIntent } from '../lib/auth/onboarding';
 
 export const NoMembershipScreen: React.FC = () => {
-  const { user, profile, signOut, refreshContext } = useAuth();
+  const { user, profile, signOut, refreshContext, recoverOwnerOnboarding } = useAuth();
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(false);
+  const ownerIntent = readOwnerOnboardingIntent(user?.user_metadata);
+
+  const recoverOwner = async () => {
+    setRecovering(true);
+    setRecoveryError(null);
+    const outcome = await recoverOwnerOnboarding();
+    if (outcome.error) setRecoveryError(outcome.error.message);
+    setRecovering(false);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-12">
@@ -11,6 +24,18 @@ export const NoMembershipScreen: React.FC = () => {
         <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 mx-auto mb-4 flex items-center justify-center">
           <Building2 className="w-6 h-6" />
         </div>
+
+        <div className="mb-6"><StaffInvitationForm /></div>
+
+        {ownerIntent && (
+          <div className="mb-6 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4 text-left text-xs text-slate-300">
+            <p className="mb-3">A validated owner-onboarding request is attached to this identity. Recovery is explicit and reuses request <code className="text-sky-300">{ownerIntent.request_id}</code>.</p>
+            {recoveryError && <p role="alert" className="mb-3 text-rose-300">{recoveryError}</p>}
+            <button type="button" disabled={recovering} onClick={recoverOwner} className="w-full rounded-lg bg-sky-500 px-3 py-2 font-bold text-slate-950 disabled:opacity-50">
+              {recovering ? 'Checking server contract…' : 'Recover owner onboarding'}
+            </button>
+          </div>
+        )}
 
         <h2 className="text-xl font-bold text-white mb-2">No Active Pharmacy Membership</h2>
         <p className="text-xs text-slate-400 mb-6 leading-relaxed">

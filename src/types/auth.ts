@@ -27,7 +27,9 @@ export interface AuthContextValue {
   subscription: Subscription | null;
   error: string | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null; requiresEmailConfirmation: boolean }>;
+  signUp: (email: string, password: string, fullName: string, pharmacyName: string) => Promise<{ error: Error | null; requiresEmailConfirmation: boolean }>;
+  recoverOwnerOnboarding: () => Promise<{ error: Error | null }>;
+  acceptStaffInvitation: (invitationId: string, rawToken: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   selectPharmacy: (pharmacyId: string) => Promise<void>;
   refreshContext: () => Promise<void>;

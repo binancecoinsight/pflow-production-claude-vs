@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Building2, 
@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabase';
 import { Supplier } from './../../types/database';
 import { createSupplier, updateSupplier } from '../../lib/suppliers/service';
 import { validateCreateSupplierInput, validateUpdateSupplierInput } from '../../lib/suppliers/validation';
+import { CapabilityAsyncBoundary } from '../../lib/subscription/capabilityBoundary';
 
 interface SupplierModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface SupplierModalProps {
   pharmacyId: string;
   editingSupplier: Supplier | null;
   onSuccess: (supplier: Supplier) => void;
+  mutationsAllowed: boolean;
 }
 
 export const SupplierModal: React.FC<SupplierModalProps> = ({
@@ -27,8 +29,10 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
   onClose,
   pharmacyId,
   editingSupplier,
-  onSuccess
+  onSuccess,
+  mutationsAllowed
 }) => {
+  const mutationBoundaryRef = useRef(new CapabilityAsyncBoundary(pharmacyId, mutationsAllowed));
   const [name, setName] = useState<string>('');
   const [contactPerson, setContactPerson] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
@@ -57,10 +61,18 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
     setFieldErrors({});
   }, [editingSupplier, isOpen]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (mutationBoundaryRef.current.update(pharmacyId, mutationsAllowed && isOpen)) setIsSubmitting(false);
+  }, [pharmacyId, mutationsAllowed, isOpen]);
+
+  useEffect(() => () => mutationBoundaryRef.current.invalidate(), []);
+
+  if (!isOpen || !mutationsAllowed) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const mutationToken = mutationBoundaryRef.current.begin();
+    if (!mutationToken) return;
     setSubmitError(null);
     setFieldErrors({});
 
@@ -92,6 +104,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
           email,
           address
         });
+        if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
 
         if (!result.success || !result.supplier) {
           setSubmitError(result.error || 'Failed to update supplier');
@@ -102,10 +115,11 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
         onSuccess(result.supplier);
         onClose();
       } catch (err: unknown) {
+        if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
         const msg = err instanceof Error ? err.message : 'Error updating supplier';
         setSubmitError(msg);
       } finally {
-        setIsSubmitting(false);
+        if (mutationBoundaryRef.current.accepts(mutationToken)) setIsSubmitting(false);
       }
     } else {
       // Create validation
@@ -137,6 +151,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
           email,
           address
         });
+        if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
 
         if (!result.success || !result.supplier) {
           setSubmitError(result.error || 'Failed to create supplier');
@@ -147,10 +162,11 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
         onSuccess(result.supplier);
         onClose();
       } catch (err: unknown) {
+        if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
         const msg = err instanceof Error ? err.message : 'Error creating supplier';
         setSubmitError(msg);
       } finally {
-        setIsSubmitting(false);
+        if (mutationBoundaryRef.current.accepts(mutationToken)) setIsSubmitting(false);
       }
     }
   };

@@ -174,9 +174,10 @@ export interface RequestPayload {
   timestamp: string | number;
   nonce: string;
   sale_id: string;
-  product_id: string;
-  batch_id: string;
-  quantity: number;
+  product_id?: string;
+  batch_id?: string;
+  quantity?: number;
+  checkout_intent_id?: string;
   payload?: Record<string, unknown>;
   payload_hash?: string;
 }
@@ -202,7 +203,86 @@ export interface GatewayPipelineDeps {
     deficit_created?: boolean;
     processed_at?: string;
   }>;
+  commitSale?: (params: {
+    actor_user_id: string;
+    client_op_id: string;
+    checkout_intent_id: string;
+    pharmacy_id: string;
+    branch_id: string;
+    device_id: string;
+    nonce: string;
+    payload_hash: string;
+    sale: Record<string, unknown>;
+    items: unknown[];
+  }) => Promise<{
+    operation_status: string;
+    sale_id: string;
+    processed_at: string;
+    response_payload: Record<string, unknown>;
+  }>;
 }
+
+type DatabaseErrorShape = { code?: unknown; message?: unknown; details?: unknown; constraint?: unknown };
+export type NormalizedGatewayError = { status: number; error_code: string; error: string };
+
+export const normalizeGatewayError = (value: unknown): NormalizedGatewayError => {
+  const row = (value && typeof value === 'object' ? value : {}) as DatabaseErrorShape;
+  const code = typeof row.code === 'string' ? row.code : '';
+  const message = row.message instanceof String || typeof row.message === 'string' ? String(row.message) : '';
+    const details = typeof row.details === 'string' ? row.details : '';
+    const constraint = typeof row.constraint === 'string' ? row.constraint : '';
+    const marker = message.trim().toUpperCase();
+    const exactMarker = (name: string) => marker === name || marker.startsWith(`${name}:`);
+    if (code === '42501') return { status: 403, error_code: 'SALE_FORBIDDEN', error: 'Sale commit is not authorized' };
+    if (code === '40001') return { status: 409, error_code: 'SERIALIZATION_FAILURE', error: 'Sale commit serialization conflict' };
+    if (code === '40P01') return { status: 409, error_code: 'DEADLOCK_DETECTED', error: 'Sale commit deadlock conflict' };
+    if (code === '22023' || code === '23514') {
+      return { status: 400, error_code: 'INVALID_SALE_PAYLOAD', error: 'Sale payload was rejected' };
+    }
+    const checkoutConstraint = 'uq_sales_pharmacy_checkout_intent';
+    const isKnownCheckoutUnique = code === '23505' && (
+      constraint === checkoutConstraint || message.includes(checkoutConstraint) || details.includes(checkoutConstraint)
+    );
+    if (isKnownCheckoutUnique) {
+      return { status: 409, error_code: 'CHECKOUT_CONFLICT', error: 'Checkout intent conflicts with an existing sale' };
+    }
+    const markerResult = exactMarker('NONCE_REPLAY')
+      ? { status: 409, error_code: 'NONCE_REPLAY', error: 'Nonce was already consumed; reconcile operation status' }
+      : exactMarker('PAYLOAD_CONFLICT') || exactMarker('PAYLOAD_HASH_CONFLICT')
+        ? { status: 409, error_code: 'PAYLOAD_CONFLICT', error: 'Payload hash conflicts with existing operation evidence' }
+        : exactMarker('IDEMPOTENCY_VIOLATION') || exactMarker('IDEMPOTENCY_CONFLICT')
+          ? { status: 409, error_code: 'IDEMPOTENCY_CONFLICT', error: 'Client operation conflicts with existing evidence' }
+          : exactMarker('CHECKOUT_CONFLICT')
+            ? { status: 409, error_code: 'CHECKOUT_CONFLICT', error: 'Checkout intent conflicts with an existing sale' }
+            : null;
+    if (markerResult && (!code || code === '23505' || code === 'P0001')) return markerResult;
+    // An unknown unique violation is not safe to classify as an idempotency conflict.
+    return { status: 500, error_code: 'SALE_COMMIT_FAILED', error: 'Sale commit result is unavailable' };
+};
+
+export const validateAuthoritativeSaleResult = (
+  value: unknown,
+  expected: { client_op_id: string; sale_id: string; checkout_intent_id: string }
+  ): { operation_status: 'COMMITTED' | 'ALREADY_COMMITTED'; client_op_id: string; sale_id: string; checkout_intent_id: string; processed_at: string; original_processed_at: string } | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  if (row.operation_status !== 'COMMITTED' && row.operation_status !== 'ALREADY_COMMITTED') return null;
+    if (row.sale_id !== expected.sale_id || typeof row.processed_at !== 'string' || !Number.isFinite(Date.parse(row.processed_at))) return null;
+  const payload = row.response_payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const original = payload as Record<string, unknown>;
+  if (original.operation_status !== 'COMMITTED' || original.client_op_id !== expected.client_op_id ||
+      original.sale_id !== expected.sale_id || original.checkout_intent_id !== expected.checkout_intent_id ||
+      typeof original.processed_at !== 'string' || !Number.isFinite(Date.parse(original.processed_at))) return null;
+  return {
+    operation_status: row.operation_status,
+    client_op_id: expected.client_op_id,
+      sale_id: expected.sale_id,
+      checkout_intent_id: expected.checkout_intent_id,
+      processed_at: row.processed_at,
+      original_processed_at: original.processed_at
+    };
+};
 
 /**
  * Internal core pipeline execution with explicit dependencies.
@@ -287,6 +367,7 @@ export async function executeGatewayPipeline(
       device_id,
       branch_id,
       client_op_id,
+      checkout_intent_id,
       timestamp,
       nonce,
       sale_id,
@@ -296,6 +377,7 @@ export async function executeGatewayPipeline(
       payload,
       payload_hash
     } = body;
+    const checkoutIntentId = typeof checkout_intent_id === 'string' ? checkout_intent_id : '';
 
     // 6. UUID Parameter Validations
     if (
@@ -304,9 +386,7 @@ export async function executeGatewayPipeline(
       !isValidUuid(branch_id) ||
       !isValidUuid(client_op_id) ||
       !isValidUuid(nonce) ||
-      !isValidUuid(sale_id) ||
-      !isValidUuid(product_id) ||
-      !isValidUuid(batch_id)
+      !isValidUuid(sale_id)
     ) {
       return new Response(JSON.stringify({ error: 'Validation failed: Invalid UUID parameter format' }), {
         status: 400,
@@ -314,7 +394,14 @@ export async function executeGatewayPipeline(
       });
     }
 
-    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
+    if (deps.commitSale && (!isValidUuid(checkoutIntentId) || !payload || !Array.isArray(payload.line_items))) {
+      return new Response(JSON.stringify({ error: 'Validation failed: complete sale payload and checkout intent are required', error_code: 'INVALID_SALE_PAYLOAD' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!deps.commitSale && (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0 || !isValidUuid(product_id) || !isValidUuid(batch_id))) {
       return new Response(JSON.stringify({ error: 'Validation failed: quantity must be a positive integer' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -432,43 +519,98 @@ export async function executeGatewayPipeline(
       });
     }
 
-    // 13. Atomically Consume the Nonce (ONLY AFTER SIGNATURE VERIFICATION SUCCEEDS)
-    const nonceConsumed = await deps.consumeNonce(nonce, pharmacy_id, device_id);
-    if (!nonceConsumed) {
-      return new Response(JSON.stringify({ error: 'Nonce invalid, already consumed, or device mismatch' }), {
-        status: 401,
+    // 13. The v1 commit RPC consumes the nonce in the same database transaction.
+    // Legacy M-6 retains its separate nonce call for compatibility only.
+    let rpcResult;
+    try {
+      if (deps.commitSale) {
+        const salePayload = payload as Record<string, unknown>;
+        if (salePayload.sale_id !== sale_id || salePayload.client_op_id !== client_op_id ||
+            salePayload.pharmacy_id !== pharmacy_id || salePayload.branch_id !== branch_id ||
+             salePayload.checkout_intent_id !== checkoutIntentId) {
+          return new Response(JSON.stringify({ error: 'Signed payload routing fields do not match request', error_code: 'PAYLOAD_ROUTE_MISMATCH' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        rpcResult = await deps.commitSale({
+          actor_user_id: authUserId,
+          client_op_id,
+          checkout_intent_id: checkoutIntentId,
+          pharmacy_id,
+          branch_id,
+          device_id,
+          nonce,
+          payload_hash: computedPayloadHash,
+          sale: {
+            id: salePayload.sale_id,
+            customer_id: salePayload.customer_id,
+            currency: salePayload.currency,
+            subtotal: salePayload.subtotal,
+            discount: salePayload.discount,
+            tax: salePayload.tax,
+            total: salePayload.total,
+            payment_method: salePayload.payment_method,
+            amount_tendered: salePayload.amount_tendered,
+            change_due: salePayload.change_due,
+            payment_status: salePayload.payment_status,
+            client_created_at: new Date(Number(salePayload.created_at)).toISOString()
+          },
+          items: salePayload.line_items as unknown[]
+        });
+      } else {
+        const nonceConsumed = await deps.consumeNonce(nonce, pharmacy_id, device_id);
+        if (!nonceConsumed) {
+          return new Response(JSON.stringify({ error: 'Nonce invalid, already consumed, or device mismatch', error_code: 'NONCE_REPLAY' }), {
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        rpcResult = await deps.ingestStock({
+          client_op_id, pharmacy_id, branch_id, device_id, sale_id,
+          product_id: product_id!, batch_id: batch_id!, quantity: quantity!,
+          payload_hash: computedPayloadHash
+        });
+      }
+    } catch (error: unknown) {
+      const normalized = normalizeGatewayError(error);
+      return new Response(JSON.stringify({ error: normalized.error, error_code: normalized.error_code }), {
+        status: normalized.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // 14. Private Stock-Ingestion RPC Call
-    let rpcResult;
-    try {
-      rpcResult = await deps.ingestStock({
-        client_op_id,
-        pharmacy_id,
-        branch_id,
-        device_id,
-        sale_id,
-        product_id,
-        batch_id,
-        quantity,
-        payload_hash: computedPayloadHash
+    if (deps.commitSale) {
+      const authoritative = validateAuthoritativeSaleResult(rpcResult, {
+        client_op_id, sale_id, checkout_intent_id: checkoutIntentId
       });
-    } catch {
-      return new Response(JSON.stringify({ error: 'Stock ingestion rejected by database transaction' }), {
-        status: 409,
+      if (!authoritative) {
+        return new Response(JSON.stringify({
+          error: 'Authoritative sale result was incomplete or identity-mismatched',
+          error_code: 'UNCERTAIN_RESULT'
+        }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ success: true, ...authoritative }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const stockResult = rpcResult as Awaited<ReturnType<GatewayPipelineDeps['ingestStock']>>;
+    if (!stockResult || (stockResult.operation_status !== 'COMMITTED' && stockResult.operation_status !== 'ALREADY_COMMITTED') ||
+        typeof stockResult.processed_at !== 'string' || !Number.isFinite(Date.parse(stockResult.processed_at))) {
+      return new Response(JSON.stringify({ error: 'Authoritative stock result was incomplete', error_code: 'UNCERTAIN_RESULT' }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     return new Response(JSON.stringify({
       success: true,
       client_op_id,
-      operation_status: rpcResult.operation_status || 'COMMITTED',
-      new_stock: rpcResult.new_stock,
-      deficit_created: rpcResult.deficit_created,
-      processed_at: rpcResult.processed_at || new Date().toISOString()
+      operation_status: stockResult.operation_status,
+      new_stock: stockResult.new_stock,
+      deficit_created: stockResult.deficit_created,
+      processed_at: stockResult.processed_at
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -545,7 +687,26 @@ export async function handleSyncPushSale(req: Request): Promise<Response> {
       });
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
-      return row || { operation_status: 'COMMITTED' };
+      if (!row) throw { code: 'PGRST116' };
+      return row;
+    },
+    commitSale: async (params) => {
+      const { data, error } = await supabaseAdmin.rpc('rpc_commit_sale_v1', {
+        p_actor_user_id: params.actor_user_id,
+        p_client_op_id: params.client_op_id,
+        p_checkout_intent_id: params.checkout_intent_id,
+        p_pharmacy_id: params.pharmacy_id,
+        p_branch_id: params.branch_id,
+        p_device_id: params.device_id,
+        p_nonce: params.nonce,
+        p_payload_hash: params.payload_hash,
+        p_sale: params.sale,
+        p_items: params.items
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) throw { code: 'PGRST116' };
+      return row;
     }
   };
 

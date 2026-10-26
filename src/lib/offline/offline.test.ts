@@ -55,7 +55,9 @@ async function runOfflineTestSuite() {
     product_id: '22222222-2222-4222-8222-222222222222',
     batch_id: '33333333-3333-4333-8333-333333333333',
     quantity: 3,
-    branch_id: '44444444-4444-4444-8444-444444444444'
+    branch_id: '44444444-4444-4444-8444-444444444444',
+    checkout_intent_id: '77777777-7777-4777-8777-777777777777',
+    line_items: []
   };
 
   const { transaction: txA, queueItem: qA } = await createLocalTransaction({
@@ -168,10 +170,10 @@ async function runOfflineTestSuite() {
   console.log('\n[5. Crash Recovery & Ambiguous Status Resolution]');
   // Create a stuck SYNCING item simulating an app crash 10 minutes ago
   const stuckOpId = crypto.randomUUID().toLowerCase();
-  const { queueItem: stuckQ } = await createLocalTransaction({
+  const { queueItem: stuckQ, transaction: stuckTx } = await createLocalTransaction({
     pharmacy_id: pharmacyA,
     client_op_id: stuckOpId,
-    payload: salePayload
+    payload: { ...salePayload, checkout_intent_id: '55555555-5555-4555-8555-555555555555', line_items: [] }
   }, indexedDB);
 
   // Manually put in SYNCING state with stale lease
@@ -189,10 +191,17 @@ async function runOfflineTestSuite() {
     rpcGetClientOpStatus: async (pId, opId) => {
       rpcCalledWithOp = opId;
       return {
+        pharmacy_id: pId,
         client_op_id: opId,
-        status: 'COMMITTED',
+        outcome: 'CONFIRMED_COMMITTED' as const,
+        operation_kind: 'UNIFIED_SALE_V1' as const,
+        payload_hash: stuckTx.payload_hash,
+        sale_id: salePayload.sale_id,
+        checkout_intent_id: '55555555-5555-4555-8555-555555555555',
         response_status: '200 OK',
-        processed_at: new Date().toISOString()
+        response_payload: { operation_status: 'COMMITTED', client_op_id: opId, sale_id: salePayload.sale_id,
+          checkout_intent_id: '55555555-5555-4555-8555-555555555555', processed_at: new Date().toISOString() },
+        processed_at: new Date().toISOString(), record_id: salePayload.sale_id, return_id: null
       };
     }
   }, indexedDB);
@@ -208,7 +217,7 @@ async function runOfflineTestSuite() {
   const { queueItem: uncommittedQ } = await createLocalTransaction({
     pharmacy_id: pharmacyA,
     client_op_id: uncommittedOpId,
-    payload: salePayload
+    payload: { ...salePayload, checkout_intent_id: '66666666-6666-4666-8666-666666666666', line_items: [] }
   }, indexedDB);
   await updateQueueItem({
     ...uncommittedQ,
@@ -217,7 +226,12 @@ async function runOfflineTestSuite() {
   }, indexedDB);
 
   const mockServerUncommittedDispatcher = new SyncDispatcher({
-    rpcGetClientOpStatus: async () => null // Server has no record
+    rpcGetClientOpStatus: async (pId, opId) => ({
+      pharmacy_id: pId,
+      outcome: 'CONFIRMED_ABSENT', client_op_id: opId, operation_kind: 'UNKNOWN', payload_hash: null,
+      sale_id: null, checkout_intent_id: null, response_status: 'AUTHORIZED_ABSENCE', response_payload: null, processed_at: null,
+      record_id: null, return_id: null
+    })
   }, indexedDB);
 
   const recoveredUncommittedCount = await mockServerUncommittedDispatcher.recoverStaleOperations(pharmacyA, 60000);
@@ -248,6 +262,9 @@ async function runOfflineTestSuite() {
       return new Response(JSON.stringify({
         success: true,
         operation_status: 'COMMITTED',
+        client_op_id: successOpId,
+        sale_id: salePayload.sale_id,
+        checkout_intent_id: salePayload.checkout_intent_id,
         new_stock: 42,
         deficit_created: false,
         processed_at: new Date().toISOString()
@@ -301,7 +318,7 @@ async function runOfflineTestSuite() {
   const auditResult = await getOperationResult(pharmacyA, successOpId, indexedDB);
   assert(auditResult !== null && auditResult.resulting_stock === 42, 'OperationResult audit row recorded in IndexedDB');
 
-  // Test 6.2: Network Failure -> RETRYABLE
+  // Test 6.2: Network Failure -> UNCERTAIN
   const networkFailOpId = crypto.randomUUID().toLowerCase();
   const { queueItem: netFailQ } = await createLocalTransaction({
     pharmacy_id: pharmacyA,
@@ -316,11 +333,11 @@ async function runOfflineTestSuite() {
   }, indexedDB);
 
   const netResult = await netFailDispatcher.dispatchOne(netFailQ, deviceIdentity, 'mock-jwt');
-  assert(netResult.status === 'RETRYABLE', 'Network failure classified as RETRYABLE');
+  assert(netResult.status === 'UNCERTAIN', 'Network response loss classified as UNCERTAIN');
   const netQueueItem = await getQueueItem(pharmacyA, networkFailOpId, indexedDB);
-  assert(netQueueItem?.status === 'RETRYABLE', 'Queue item updated to RETRYABLE');
+  assert(netQueueItem?.status === 'UNCERTAIN', 'Queue item preserves ambiguous outcome as UNCERTAIN');
   assert(netQueueItem?.attempts === 1, 'Attempt counter incremented');
-  assert(netQueueItem?.next_attempt_at !== undefined, 'Next attempt scheduled with backoff');
+  assert(netQueueItem?.next_attempt_at !== undefined, 'Original schedule retained while automatic resend is disabled');
 
   // Test 6.3: HTTP 401 Unauthorized -> AUTH_REQUIRED
   const authFailOpId = crypto.randomUUID().toLowerCase();
@@ -352,7 +369,7 @@ async function runOfflineTestSuite() {
   const blockResult = await blockDispatcher.dispatchOne(blockQ, deviceIdentity, 'mock-jwt');
   assert(blockResult.status === 'DEVICE_BLOCKED', 'HTTP 403 classified as DEVICE_BLOCKED');
 
-  // Test 6.5: HTTP 409 Conflict -> PERMANENT_FAILURE
+  // Test 6.5: HTTP 409 Conflict -> CONFLICT
   const conflictOpId = crypto.randomUUID().toLowerCase();
   const { queueItem: conflictQ } = await createLocalTransaction({
     pharmacy_id: pharmacyA,
@@ -365,9 +382,9 @@ async function runOfflineTestSuite() {
   }, indexedDB);
 
   const conflictResult = await conflictDispatcher.dispatchOne(conflictQ, deviceIdentity, 'mock-jwt');
-  assert(conflictResult.status === 'PERMANENT_FAILURE', 'HTTP 409 classified as PERMANENT_FAILURE');
+  assert(conflictResult.status === 'CONFLICT', 'HTTP 409 classified as CONFLICT');
   const conflictTx = await getLocalTransaction(pharmacyA, conflictOpId, indexedDB);
-  assert(conflictTx?.status === 'PERMANENT_FAILURE', 'Local transaction marked PERMANENT_FAILURE');
+  assert(conflictTx?.status === 'CONFLICT', 'Local transaction marked CONFLICT');
 
   // Test 6.6: Tampered Payload Detection
   const tamperOpId = crypto.randomUUID().toLowerCase();
@@ -409,7 +426,8 @@ async function runOfflineTestSuite() {
     fetchFn: async () => {
       concurrentCallsCountA++;
       await new Promise(r => setTimeout(r, 50));
-      return new Response(JSON.stringify({ success: true, operation_status: 'COMMITTED' }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, operation_status: 'COMMITTED', client_op_id: concOpIdA,
+        sale_id: salePayload.sale_id, checkout_intent_id: salePayload.checkout_intent_id, processed_at: new Date().toISOString() }), { status: 200 });
     }
   }, indexedDB);
 
@@ -447,7 +465,7 @@ async function runOfflineTestSuite() {
 
   const heldLeaseAcq = await acquireQueueLease(pharmacyA, heldOpId, 60000, indexedDB);
   assert(heldLeaseAcq.acquired === false, 'Test B: Lease acquisition rejected because lease is currently active');
-  assert(heldLeaseAcq.reason === 'LEASE_ACTIVE', 'Test B: Reason is LEASE_ACTIVE');
+  assert(heldLeaseAcq.reason === 'RECONCILIATION_REQUIRED', 'Test B: Reason requires authoritative reconciliation');
 
   const heldDispatchRes = await heldDispatcher.dispatchOne(heldQ, deviceIdentity, 'mock-jwt');
   assert(Boolean(heldDispatchRes.error?.includes('not acquired') || heldDispatchRes.error?.includes('locked')), 'Test B: Dispatcher declined to dispatch operation with active lease');
@@ -469,9 +487,9 @@ async function runOfflineTestSuite() {
   }, indexedDB);
 
   const staleLeaseAcq = await acquireQueueLease(pharmacyA, staleLeaseOpId, 60000, indexedDB);
-  assert(staleLeaseAcq.acquired === true, 'Test C: Stale lease (> 60s) was successfully reacquired');
-  assert(staleLeaseAcq.item?.status === 'SYNCING', 'Test C: Status remains SYNCING');
-  assert(Number(staleLeaseAcq.item?.locked_at) > oldLeaseTimestamp, 'Test C: locked_at timestamp was refreshed to current time');
+  assert(staleLeaseAcq.acquired === false, 'Test C: Stale SYNCING is never reacquired without reconciliation');
+  assert(staleLeaseAcq.reason === 'RECONCILIATION_REQUIRED', 'Test C: Stale lease requires authoritative status evidence');
+  assert(staleLeaseAcq.item?.locked_at === oldLeaseTimestamp, 'Test C: stale lease evidence is preserved');
 
   // Test D — Pharmacy isolation on lease acquisition
   const isoLeaseAcq = await acquireQueueLease(pharmacyB, staleLeaseOpId, 60000, indexedDB);
@@ -502,7 +520,8 @@ async function runOfflineTestSuite() {
     fetchFn: async () => {
       crossTabFetchCount++;
       await new Promise(r => setTimeout(r, 60)); // Simulate network latency
-      return new Response(JSON.stringify({ success: true, operation_status: 'COMMITTED' }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, operation_status: 'COMMITTED', client_op_id: crossTabOpId,
+        sale_id: salePayload.sale_id, checkout_intent_id: salePayload.checkout_intent_id, processed_at: new Date().toISOString() }), { status: 200 });
     }
   }, indexedDB);
 
@@ -510,7 +529,8 @@ async function runOfflineTestSuite() {
     fetchFn: async () => {
       crossTabFetchCount++;
       await new Promise(r => setTimeout(r, 60)); // Simulate network latency
-      return new Response(JSON.stringify({ success: true, operation_status: 'COMMITTED' }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, operation_status: 'COMMITTED', client_op_id: crossTabOpId,
+        sale_id: salePayload.sale_id, checkout_intent_id: salePayload.checkout_intent_id, processed_at: new Date().toISOString() }), { status: 200 });
     }
   }, indexedDB);
 

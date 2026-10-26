@@ -1,0 +1,90 @@
+{
+  "checkpoint": "PF-SUP-2026-10-23-03",
+  "status": "UNEXECUTED_REVIEW_FIXTURE_DEFINITION",
+  "namespace": "PharmacyFlow Phase B acceptance only",
+  "collision_policy": "Abort if any fixed ID exists with an unexpected owner, tenant, name, or email.",
+  "tenants": {
+    "tenant_a": { "id": "b1000000-0000-4000-8000-000000000001", "name": "PF Phase B Acceptance Tenant A" },
+    "tenant_b": { "id": "b1000000-0000-4000-8000-000000000002", "name": "PF Phase B Acceptance Tenant B" }
+  },
+  "branches": {
+    "a1": { "id": "b2000000-0000-4000-8000-000000000001", "tenant": "tenant_a", "name": "A1" },
+    "a2": { "id": "b2000000-0000-4000-8000-000000000002", "tenant": "tenant_a", "name": "A2" },
+    "b1": { "id": "b2000000-0000-4000-8000-000000000003", "tenant": "tenant_b", "name": "B1" }
+  },
+  "users": {
+    "owner_a": { "id": "b3000000-0000-4000-8000-000000000001", "role": "OWNER", "tenant": "tenant_a", "branch": "a1", "status": "ACTIVE" },
+    "manager_a": { "id": "b3000000-0000-4000-8000-000000000002", "role": "MANAGER", "tenant": "tenant_a", "branch": "a1", "status": "ACTIVE" },
+    "pharmacist_a": { "id": "b3000000-0000-4000-8000-000000000003", "role": "PHARMACIST", "tenant": "tenant_a", "branch": "a2", "status": "ACTIVE" },
+    "cashier_a": { "id": "b3000000-0000-4000-8000-000000000004", "role": "CASHIER", "tenant": "tenant_a", "branch": "a1", "status": "ACTIVE" },
+    "cashier_b": { "id": "b3000000-0000-4000-8000-000000000005", "role": "CASHIER", "tenant": "tenant_a", "branch": "a2", "status": "ACTIVE" },
+    "inactive_a": { "id": "b3000000-0000-4000-8000-000000000006", "role": "CASHIER", "tenant": "tenant_a", "branch": "a1", "status": "SUSPENDED" },
+    "cashier_tenant_b": { "id": "b3000000-0000-4000-8000-000000000007", "role": "CASHIER", "tenant": "tenant_b", "branch": "b1", "status": "ACTIVE" },
+    "cashier_c": { "id": "b3000000-0000-4000-8000-000000000008", "role": "CASHIER", "tenant": "tenant_a", "branch": "a1", "status": "ACTIVE" }
+  },
+  "devices": {
+    "a1": "b4000000-0000-4000-8000-000000000001",
+    "a2": "b4000000-0000-4000-8000-000000000002"
+  },
+  "catalog": {
+    "product": "b5000000-0000-4000-8000-000000000001",
+    "batch_a1": "b6000000-0000-4000-8000-000000000001",
+    "batch_a2": "b6000000-0000-4000-8000-000000000002",
+    "batch_m18_sequential": "b6000000-0000-4000-8000-000000000101",
+    "batch_m18_concurrent_replay": "b6000000-0000-4000-8000-000000000201",
+    "batch_m18_concurrent_checkout": "b6000000-0000-4000-8000-000000000202",
+    "starting_quantity_each": 20,
+    "unit_price_minor": 1000
+  },
+  "customers": {
+    "customer_a": "b7000000-0000-4000-8000-000000000001",
+    "customer_b": "b7000000-0000-4000-8000-000000000002"
+  },
+  "operations": {
+    "cashier_a_sale": "ba000000-0000-4000-8000-000000000001",
+    "cashier_b_sale": "ba000000-0000-4000-8000-000000000002",
+    "return_v1": "ba000000-0000-4000-8000-000000000003",
+    "return_v2": "ba000000-0000-4000-8000-000000000004",
+    "journal_only": "ba000000-0000-4000-8000-000000000005",
+    "legacy_stock": "ba000000-0000-4000-8000-000000000006",
+    "truly_absent": "ba000000-0000-4000-8000-000000000099",
+    "m18_first": "ba000000-0000-4000-8000-000000000101",
+    "m18_same_checkout_competitor": "ba000000-0000-4000-8000-000000000102"
+  },
+  "checkout_intents": {
+    "m18_primary": "bb000000-0000-4000-8000-000000000001",
+    "browser_customer_a": "bb000000-0000-4000-8000-000000000002",
+    "browser_customer_b": "bb000000-0000-4000-8000-000000000003",
+    "status_cashier_a": "bb000000-0000-4000-8000-000000000011",
+    "status_cashier_b": "bb000000-0000-4000-8000-000000000012",
+    "m18_sequential": "bb000000-0000-4000-8000-000000000101",
+    "m18_concurrent_replay": "bb000000-0000-4000-8000-000000000201",
+    "m18_concurrent_checkout": "bb000000-0000-4000-8000-000000000202"
+  },
+  "payloads": {
+    "m18_primary_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "m18_changed_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "requirement": "Persist and replay identical canonical UTF-8 bytes for exact-replay cases; do not reconstruct JSON between calls."
+  },
+  "fixture_groups": {
+    "status_v2": { "commit_required": false, "exception": "Commit when PostgREST or another connection must observe the rows." },
+    "m18_single_session": { "commit_required": false },
+    "m18_cross_session": { "commit_required": true, "reason": "Independent backend sessions cannot observe an uncommitted setup transaction." },
+    "refund_v2_cross_session": { "commit_required": true, "source": "scripts/refund-v2-concurrency-setup.sql" },
+    "browser_cross_tab_restart": { "commit_required": true, "reason": "Tabs/restarts require durable browser and server-visible state." }
+  },
+  "worksheets": {
+    "committed_setup": "scripts/phase-b-acceptance/gate-ab-fixture.sql",
+    "gate_a_assertions": "scripts/phase-b-acceptance/gate-a-assertions.sql",
+    "gate_b_sequential": "scripts/phase-b-acceptance/gate-b-sequential.sql",
+    "gate_b_concurrency": "scripts/phase-b-acceptance/gate-b-concurrency.ps1",
+    "identity_guarded_cleanup": "scripts/phase-b-acceptance/gate-ab-cleanup.sql"
+  },
+  "required_final_invariants": {
+    "tenant_leakage_rows": 0,
+    "duplicate_sale_effects_per_checkout": 0,
+    "duplicate_refund_inventory_effects": 0,
+    "losing_operation_nonce_or_pending_journal_rows": 0,
+    "fixture_rows_after_cleanup": 0
+  }
+}

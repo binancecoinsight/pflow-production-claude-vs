@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "supabase/functions/_shared/owner-security-i3.ts",
+    "supabase/functions/owner-eligibility-gateway/index.ts",
+    "supabase/functions/owner-eligibility-gateway/index.test.ts",
+    "supabase/functions/platform-admission-operator/index.ts",
+    "supabase/functions/platform-admission-operator/index.test.ts",
+    "supabase/contracts/owner_gateway_operator_v1.test.ts"
+  ],
+  "exclude": ["node_modules"]
+}

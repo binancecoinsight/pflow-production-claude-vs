@@ -1,16 +1,22 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const tsxCli = resolve(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 
 const suites = [
+  'src/lib/auth/onboarding.test.ts',
+  'supabase/contracts/owner_onboarding_v1.test.ts',
+  'supabase/functions/staff-invitation-bootstrap/index.test.ts',
+  'src/lib/subscription/lifecycle.test.ts',
+  'src/lib/subscription/capabilityBoundary.test.ts',
+  'scripts/acceptance/target-guard.test.mjs',
+  'scripts/acceptance/capability-wiring.test.mjs',
   'src/lib/crypto/crypto.test.ts',
   'src/lib/offline/offline.test.ts',
   'src/lib/offline/returnSync.test.ts',
   'src/lib/offline/phase5d11_final_verification.test.ts',
+  'src/lib/offline/phaseB.test.ts',
   'src/lib/sales/sales.test.ts',
   'src/lib/sales/refundV2.test.ts',
   'src/lib/cash/reconciliation.test.ts',
@@ -45,6 +51,7 @@ const criticalSuites = new Set([
   'src/lib/sales/refundV2.test.ts',
   'src/lib/offline/offline.test.ts',
   'src/lib/offline/returnSync.test.ts',
+  'src/lib/offline/phaseB.test.ts',
   'src/lib/cash/reconciliation.test.ts',
   'src/components/sales/returns.test.ts',
   'src/components/sales/receipts.test.ts',
@@ -53,10 +60,6 @@ const criticalSuites = new Set([
   'supabase/contracts/pharmacyflow_postsealed_contract.test.ts'
 ]);
 
-if (!existsSync(tsxCli)) {
-  throw new Error('Local tsx CLI is unavailable. Run npm.cmd install before executing tests.');
-}
-
 const selectedSuites = process.argv.includes('--critical')
   ? suites.filter((suite) => criticalSuites.has(suite))
   : suites;
@@ -64,7 +67,11 @@ let failed = 0;
 
 for (const suite of selectedSuites) {
   console.log(`\n=== ${suite} ===`);
-  const result = spawnSync(process.execPath, [tsxCli, suite], {
+  const result = spawnSync(process.execPath, [
+    '--loader',
+    './scripts/typescript-loader.mjs',
+    suite
+  ], {
     cwd: root,
     env: process.env,
     stdio: 'inherit'

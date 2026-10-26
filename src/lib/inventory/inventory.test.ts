@@ -392,6 +392,7 @@ async function runInventoryTestSuite() {
   // Feed populated line item directly into Phase 5D-3 createLocalSale
   const saleRes = await createLocalSale(
     {
+      compatibility_non_draft: true,
       pharmacy_id: pharmacyA,
       branch_id: branchA1,
       cashier_id: cashierA,

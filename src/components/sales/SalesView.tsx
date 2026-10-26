@@ -16,7 +16,7 @@ import { ReceiptModal } from './ReceiptModal';
 import { buildReceiptFromHistoricalSale, ReceiptData } from '../../lib/sales/receipt';
 import { Lock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-export const SalesView: React.FC = () => {
+export const SalesView: React.FC<{ refundRestockAllowed?: boolean }> = ({ refundRestockAllowed = true }) => {
   const { user, pharmacy, branch, role } = useAuth();
 
   // Network Connectivity State
@@ -33,6 +33,10 @@ export const SalesView: React.FC = () => {
   // Selected Sale for Detailed Inspection & Return Initiation
   const [selectedSale, setSelectedSale] = useState<HistoricalSale | null>(null);
   const [saleForReturn, setSaleForReturn] = useState<HistoricalSale | null>(null);
+
+  useEffect(() => {
+    if (!refundRestockAllowed) setSaleForReturn(null);
+  }, [refundRestockAllowed]);
   const [receiptToView, setReceiptToView] = useState<ReceiptData | null>(null);
 
   // Active Pharmacy Guard Ref (Tenant Boundary)
@@ -216,8 +220,10 @@ export const SalesView: React.FC = () => {
           sale={selectedSale}
           currency={pharmacy.currency || 'NGN'}
           role={role}
+          refundRestockAllowed={refundRestockAllowed}
           onClose={() => setSelectedSale(null)}
           onInitiateReturn={() => {
+            if (!refundRestockAllowed) return;
             setSaleForReturn(selectedSale);
             setSelectedSale(null);
           }}
@@ -236,7 +242,7 @@ export const SalesView: React.FC = () => {
       )}
 
       {/* Return & Refund Modal */}
-      {saleForReturn && (
+      {saleForReturn && refundRestockAllowed && (
         <ReturnModal
           sale={saleForReturn}
           currency={pharmacy.currency || 'NGN'}

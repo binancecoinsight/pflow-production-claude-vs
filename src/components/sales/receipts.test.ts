@@ -272,6 +272,7 @@ async function runReceiptsTestSuite() {
   const posSale: Sale = {
     id: '77777777-7777-4777-8777-777777777777',
     client_op_id: '88888888-8888-4888-8888-888888888888',
+    checkout_intent_id: '88888888-8888-4888-8888-888888888888',
     pharmacy_id: pharmacyA.id,
     branch_id: branchA.id,
     cashier_id: cashier1Id,

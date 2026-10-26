@@ -19,6 +19,12 @@ export interface PosSessionContext {
   cashier_id: string;  // Authenticated auth.users(id) UUID v4
   currency?: string;   // Currency code (defaults to 'NGN')
   authenticated_user_id?: string; // Authenticated Supabase session user.id to enforce cashier identity
+  checkout_scope_key?: string;
+  checkout_intent_id?: string;
+  client_op_id?: string;
+  sale_id?: string;
+  client_created_at?: number;
+  draft_revision?: number;
 }
 
 export interface PosCartLineItem {
@@ -38,6 +44,15 @@ export interface PosCartLineItem {
 }
 
 export interface PosCart {
+  checkout_scope_key: string;
+  checkout_intent_id: string;
+  client_op_id: string;
+  sale_id: string;
+  client_created_at: number;
+  draft_revision: number;
+  checkout_state: 'DRAFT' | 'LOCALLY_DURABLE';
+  transaction_id: string | null;
+  queue_id: string | null;
   pharmacy_id: string;
   branch_id: string;
   cashier_id: string;
@@ -78,6 +93,7 @@ export interface FinalizeSaleResult {
   sale?: Sale;
   transaction?: LocalTransaction;
   queueItem?: SyncQueueItem;
+  checkoutRevision?: number;
   errors?: string[];
 }
 

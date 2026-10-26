@@ -10,20 +10,24 @@ import {
 } from '../../lib/inventory/service';
 import { BarcodeDuplicateModal } from './BarcodeDuplicateModal';
 import { formatMinorUnits } from './formatters';
+import { CheckoutAsyncBoundary, runCheckoutBoundTask } from './checkoutUiLifecycle';
 
 interface ProductSearchProps {
   pharmacyId: string;
   currency: string;
   onAddToCart: (productId: string) => Promise<void>;
   isAddingProduct: boolean;
+  checkoutIdentity: string;
 }
 
 export const ProductSearch: React.FC<ProductSearchProps> = ({
   pharmacyId,
   currency,
   onAddToCart,
-  isAddingProduct
+  isAddingProduct,
+  checkoutIdentity
 }) => {
+  const requestBoundary = React.useRef(new CheckoutAsyncBoundary(checkoutIdentity));
   const [query, setQuery] = useState<string>('');
   const [products, setProducts] = useState<LocalProduct[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -36,19 +40,28 @@ export const ProductSearch: React.FC<ProductSearchProps> = ({
   const [scannedBarcode, setScannedBarcode] = useState<string>('');
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState<boolean>(false);
 
+  useEffect(() => {
+    requestBoundary.current.reset(checkoutIdentity);
+    setQuery('');
+    setProducts([]);
+    setSearchError(null);
+    setActiveFilter('ALL');
+    setDuplicateMatches([]);
+    setScannedBarcode('');
+    setIsDuplicateModalOpen(false);
+  }, [checkoutIdentity]);
+
+  useEffect(() => () => requestBoundary.current.invalidate(), []);
+
   const loadProducts = useCallback(async (searchQuery: string, filter: 'ALL' | 'BARCODE' | 'SKU') => {
     setIsLoading(true);
     setSearchError(null);
-    try {
+    const outcome = await runCheckoutBoundTask(requestBoundary.current, async () => {
       const clean = searchQuery.trim();
 
       if (!clean) {
         // Load initial local products when search is empty
-        const initialList = await listLocalProducts(pharmacyId, 60);
-        startTransition(() => {
-          setProducts(initialList);
-        });
-        return;
+        return await listLocalProducts(pharmacyId, 60);
       }
 
       let results: LocalProduct[] = [];
@@ -63,16 +76,16 @@ export const ProductSearch: React.FC<ProductSearchProps> = ({
         results = await searchProducts(pharmacyId, clean, 50);
       }
 
-      startTransition(() => {
-        setProducts(results);
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error querying local inventory catalog';
-      setSearchError(message);
-    } finally {
-      setIsLoading(false);
+      return results;
+    });
+    if (!outcome.accepted) return;
+    if ('error' in outcome) {
+      setSearchError(outcome.error instanceof Error ? outcome.error.message : 'Error querying local inventory catalog');
+    } else {
+      startTransition(() => setProducts(outcome.value));
     }
-  }, [pharmacyId]);
+    setIsLoading(false);
+  }, [pharmacyId, checkoutIdentity]);
 
   // Debounced search on query or filter change
   useEffect(() => {
@@ -97,28 +110,29 @@ export const ProductSearch: React.FC<ProductSearchProps> = ({
     if (!clean) return;
 
     setSearchError(null);
-    try {
-      const resolution = await resolveBarcodeScan(pharmacyId, clean);
+    const outcome = await runCheckoutBoundTask(requestBoundary.current, () => resolveBarcodeScan(pharmacyId, clean));
+    if (!outcome.accepted) return;
+    if ('error' in outcome) {
+      setSearchError(outcome.error instanceof Error ? outcome.error.message : 'Error resolving barcode scan');
+      return;
+    }
+    const resolution = outcome.value;
 
-      if (resolution.type === 'NO_MATCH') {
+    if (resolution.type === 'NO_MATCH') {
         setSearchError(`No product found with barcode "${clean}". Cart unchanged.`);
       } else if (resolution.type === 'SINGLE_INACTIVE') {
         const prod = resolution.product;
         setSearchError(`Product "${prod?.name || 'Selected product'}" is INACTIVE and cannot be sold. Cart unchanged.`);
       } else if (resolution.type === 'SINGLE_ACTIVE') {
         if (resolution.product) {
-          await onAddToCart(resolution.product.id);
-          setQuery('');
+          const added = await runCheckoutBoundTask(requestBoundary.current, () => onAddToCart(resolution.product!.id));
+          if (added.accepted && 'value' in added) setQuery('');
         }
       } else if (resolution.type === 'MULTIPLE_MATCHES') {
         // Collision detected: do NOT touch cart; require manual operator selection
         setScannedBarcode(clean);
         setDuplicateMatches(resolution.matches);
         setIsDuplicateModalOpen(true);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error resolving barcode scan';
-      setSearchError(msg);
     }
   }, [pharmacyId, onAddToCart]);
 
@@ -126,13 +140,10 @@ export const ProductSearch: React.FC<ProductSearchProps> = ({
     setIsDuplicateModalOpen(false);
     setDuplicateMatches([]);
     setScannedBarcode('');
-    try {
-      await onAddToCart(product.id);
-      setQuery('');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to add product to cart';
-      setSearchError(msg);
-    }
+    const outcome = await runCheckoutBoundTask(requestBoundary.current, () => onAddToCart(product.id));
+    if (!outcome.accepted) return;
+    if ('error' in outcome) setSearchError(outcome.error instanceof Error ? outcome.error.message : 'Failed to add product to cart');
+    else setQuery('');
   };
 
   const handleCloseDuplicateModal = () => {

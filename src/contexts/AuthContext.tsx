@@ -3,6 +3,14 @@ import { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { AuthContextValue, SessionState, MembershipWithPharmacy } from '../types/auth';
 import { UserProfile, PharmacyMember, Pharmacy, Branch, UserRole, Subscription } from '../types/database';
+import {
+  acceptStaffInvitationWithRpc,
+  beginOwnerRegistration,
+  createOwnerOnboardingIntent,
+  createOwnerPharmacyWithRpc,
+  DEFAULT_OWNER_ONBOARDING_DEPLOYMENT,
+  readOwnerOnboardingIntent,
+} from '../lib/auth/onboarding';
 
 const LAST_PHARMACY_KEY = 'pharmacyflow.selected_pharmacy_id';
 
@@ -267,6 +275,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user, resolveSessionContext]);
 
+  /** Explicit recovery only; normal session loading never creates a tenant. */
+  const recoverOwnerOnboarding = useCallback(async (): Promise<{ error: Error | null }> => {
+    if (!user) return { error: new Error('Sign in before recovering owner onboarding.') };
+    if (!user.email_confirmed_at) return { error: new Error('Verify the account email before recovering owner onboarding.') };
+    const intent = readOwnerOnboardingIntent(user.user_metadata);
+    if (!intent) return { error: new Error('No valid owner onboarding request is attached to this identity.') };
+    const outcome = await createOwnerPharmacyWithRpc(
+      intent,
+      (arguments_) => supabase.rpc('rpc_create_pharmacy_owner_v1', arguments_),
+    );
+    if (outcome.error) return { error: new Error(`[${outcome.error.code}] ${outcome.error.message}`) };
+    await resolveSessionContext(user);
+    return { error: null };
+  }, [user, resolveSessionContext]);
+
   /**
    * Signs in using Supabase Auth email and password.
    */
@@ -300,53 +323,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [resolveSessionContext]);
 
-  /**
-   * Registers a new user via Supabase Auth with full name metadata.
-   */
+  /** Disabled until a separately reviewed trusted owner-identity provider exists. */
   const signUp = useCallback(async (
     email: string,
     password: string,
-    fullName: string
+    fullName: string,
+    pharmacyName: string
   ): Promise<{ error: Error | null; requiresEmailConfirmation: boolean }> => {
-    if (!isSupabaseConfigured()) {
-      return {
-        error: new Error(
-          'Supabase credentials not configured. Please supply VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
-        ),
-        requiresEmailConfirmation: false
-      };
-    }
-
     try {
-      const { data, error: authError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: {
-            full_name: fullName.trim()
-          }
-        }
-      });
-
-      if (authError) {
-        return { error: authError, requiresEmailConfirmation: false };
+      if (!globalThis.crypto?.randomUUID) {
+        return { error: new Error('Secure request identity generation is unavailable; registration failed closed.'), requiresEmailConfirmation: false };
       }
-
-      const requiresConfirmation = !data.session && Boolean(data.user);
-
-      if (data.user && data.session) {
-        setUser(data.user);
-        await resolveSessionContext(data.user);
-      }
-
-      return { error: null, requiresEmailConfirmation: requiresConfirmation };
+      const intent = createOwnerOnboardingIntent(pharmacyName, globalThis.crypto.randomUUID());
+      const outcome = await beginOwnerRegistration(
+        { email, password, fullName, pharmacyName },
+        intent,
+        DEFAULT_OWNER_ONBOARDING_DEPLOYMENT,
+        null,
+      );
+      return {
+        error: outcome.error ? new Error(`[${outcome.error.code}] ${outcome.error.message}`) : null,
+        requiresEmailConfirmation: outcome.requiresEmailConfirmation,
+      };
     } catch (err: unknown) {
       return {
-        error: err instanceof Error ? err : new Error('Registration failed.'),
-        requiresEmailConfirmation: false
+        error: err instanceof Error ? err : new Error('Owner registration failed closed.'),
+        requiresEmailConfirmation: false,
       };
     }
-  }, [resolveSessionContext]);
+  }, []);
+
+  const acceptStaffInvitation = useCallback(async (invitationId: string, rawToken: string): Promise<{ error: Error | null }> => {
+    try {
+      const outcome = await acceptStaffInvitationWithRpc(
+        { invitationId, rawToken },
+        (arguments_) => supabase.rpc('rpc_accept_staff_invitation', arguments_),
+      );
+      if (outcome.error || !outcome.data) return { error: new Error(outcome.error || 'Invitation acceptance failed.') };
+      await refreshContext();
+      return { error: null };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err : new Error('Invitation acceptance failed.') };
+    }
+  }, [refreshContext]);
 
   /**
    * Signs out the active user and clears all in-memory session states.
@@ -385,6 +404,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     signIn,
     signUp,
+    recoverOwnerOnboarding,
+    acceptStaffInvitation,
     signOut,
     selectPharmacy,
     refreshContext
@@ -402,6 +423,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     signIn,
     signUp,
+    recoverOwnerOnboarding,
+    acceptStaffInvitation,
     signOut,
     selectPharmacy,
     refreshContext

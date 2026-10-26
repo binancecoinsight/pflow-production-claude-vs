@@ -20,12 +20,14 @@ export function OfflineSyncRuntime() {
     let stopped = false;
     const dispatcher = new SyncDispatcher({
       rpcGetClientOpStatus: async (pharmacyId, clientOpId) => {
-        const { data, error } = await supabase.rpc('rpc_get_client_op_status', {
+        const { data, error } = await supabase.rpc('rpc_get_client_op_status_v2', {
           p_pharmacy_id: pharmacyId,
           p_client_op_id: clientOpId
         });
         if (error) throw error;
-        return Array.isArray(data) ? data[0] || null : data || null;
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row) throw new Error('Status V2 returned no authorization-scoped evidence');
+        return row;
       }
     });
 

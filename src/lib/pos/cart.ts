@@ -13,6 +13,7 @@ import {
   selectRecommendedBatch,
   computeExpiryInfo
 } from '../inventory/index';
+import { checkoutScopeKey } from '../offline/db';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -102,10 +103,22 @@ export const createCart = (context: PosSessionContext): PosCart => {
   }
 
   const now = Date.now();
+  const pharmacyId = context.pharmacy_id.toLowerCase().trim();
+  const branchId = context.branch_id.toLowerCase().trim();
+  const cashierId = context.cashier_id.toLowerCase().trim();
   return {
-    pharmacy_id: context.pharmacy_id.toLowerCase().trim(),
-    branch_id: context.branch_id.toLowerCase().trim(),
-    cashier_id: context.cashier_id.toLowerCase().trim(),
+    checkout_scope_key: context.checkout_scope_key || checkoutScopeKey(pharmacyId, branchId, cashierId),
+    checkout_intent_id: (context.checkout_intent_id || crypto.randomUUID()).toLowerCase(),
+    client_op_id: (context.client_op_id || crypto.randomUUID()).toLowerCase(),
+    sale_id: (context.sale_id || crypto.randomUUID()).toLowerCase(),
+    client_created_at: context.client_created_at || now,
+    draft_revision: context.draft_revision ?? 0,
+    checkout_state: 'DRAFT',
+    transaction_id: null,
+    queue_id: null,
+    pharmacy_id: pharmacyId,
+    branch_id: branchId,
+    cashier_id: cashierId,
     currency: (context.currency || 'NGN').toUpperCase().trim(),
     line_items: [],
     subtotal: 0,
@@ -356,6 +369,15 @@ export const setCartDiscountsAndTaxes = (
 export const clearCart = (cart: PosCart): PosCart => {
   const now = Date.now();
   return {
+    checkout_scope_key: cart.checkout_scope_key,
+    checkout_intent_id: cart.checkout_intent_id,
+    client_op_id: cart.client_op_id,
+    sale_id: cart.sale_id,
+    client_created_at: cart.client_created_at,
+    draft_revision: cart.draft_revision,
+    checkout_state: cart.checkout_state,
+    transaction_id: cart.transaction_id,
+    queue_id: cart.queue_id,
     pharmacy_id: cart.pharmacy_id,
     branch_id: cart.branch_id,
     cashier_id: cart.cashier_id,

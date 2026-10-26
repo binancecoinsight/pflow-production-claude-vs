@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { Lock, Mail, User, AlertCircle, CheckCircle2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, User, AlertCircle, CheckCircle2, ArrowRight, ShieldCheck, Building2 } from 'lucide-react';
 
 export const AuthScreen: React.FC = () => {
   const { signIn, signUp } = useAuth();
@@ -9,6 +9,7 @@ export const AuthScreen: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [fullName, setFullName] = useState<string>('');
+  const [pharmacyName, setPharmacyName] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmationNotice, setConfirmationNotice] = useState<boolean>(false);
@@ -27,7 +28,7 @@ export const AuthScreen: React.FC = () => {
       return;
     }
 
-    if (!email || !password || (isSignUp && !fullName)) {
+    if (!email || !password || (isSignUp && (!fullName || !pharmacyName))) {
       setErrorMessage('Please fill in all required fields.');
       return;
     }
@@ -41,7 +42,7 @@ export const AuthScreen: React.FC = () => {
 
     try {
       if (isSignUp) {
-        const { error, requiresEmailConfirmation } = await signUp(email, password, fullName);
+        const { error, requiresEmailConfirmation } = await signUp(email, password, fullName, pharmacyName);
         if (error) {
           setErrorMessage(error.message);
         } else if (requiresEmailConfirmation) {
@@ -70,7 +71,7 @@ export const AuthScreen: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">PharmacyFlow</h1>
           <p className="text-sm text-slate-400 mt-1">
-            {isSignUp ? 'Create your pharmacy staff account' : 'Sign in to your pharmacy terminal'}
+            {isSignUp ? 'Request a new pharmacy owner account' : 'Sign in to your pharmacy terminal'}
           </p>
         </div>
 
@@ -108,6 +109,10 @@ export const AuthScreen: React.FC = () => {
         <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignUp && (
+              <>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200">
+                Owner registration is disabled until the trusted profile-only and OWNER-eligibility server contracts are independently verified and enabled. Submitting cannot create an Auth identity while that contract is unavailable.
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">Full Name</label>
                 <div className="relative">
@@ -122,6 +127,14 @@ export const AuthScreen: React.FC = () => {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Pharmacy Name</label>
+                <div className="relative">
+                  <Building2 className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+                  <input type="text" required={isSignUp} value={pharmacyName} onChange={(e) => setPharmacyName(e.target.value)} placeholder="Example Pharmacy" className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950/70 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition" />
+                </div>
+              </div>
+              </>
             )}
 
             <div>
@@ -163,7 +176,7 @@ export const AuthScreen: React.FC = () => {
                 <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                  <span>{isSignUp ? 'Create Owner Account' : 'Sign In'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -184,11 +197,17 @@ export const AuthScreen: React.FC = () => {
               {isSignUp ? (
                 <span>Already have a pharmacy account? <strong className="text-white">Sign In</strong></span>
               ) : (
-                <span>New staff member or pharmacist? <strong className="text-white">Register</strong></span>
+                <span>Opening a new pharmacy? <strong className="text-white">Owner Registration</strong></span>
               )}
             </button>
           </div>
         </div>
+
+        {!isSignUp && (
+          <p className="mt-4 text-center text-xs text-slate-400">
+            Invited staff must sign in with the confirmed email named by their invitation, then accept it from the no-membership screen. Staff cannot register themselves as owners.
+          </p>
+        )}
 
 
         {/* Security Assurance Badge */}

@@ -32,8 +32,9 @@ import { isOnline } from '../../lib/offline/network';
 import { ReceiptModal } from '../sales/ReceiptModal';
 import { buildReceiptFromHistoricalSale, ReceiptData } from '../../lib/sales/receipt';
 import { formatMinorUnits, formatDate } from '../pos/formatters';
+import { CapabilityAsyncBoundary } from '../../lib/subscription/capabilityBoundary';
 
-export const CustomersView: React.FC = () => {
+export const CustomersView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutationsAllowed = true }) => {
   const { user, pharmacy, branch, role } = useAuth();
 
   // State
@@ -65,6 +66,17 @@ export const CustomersView: React.FC = () => {
 
   // Guard active pharmacy ref
   const activePharmacyIdRef = useRef<string | null>(null);
+  const mutationBoundaryRef = useRef(new CapabilityAsyncBoundary('', mutationsAllowed));
+
+  useEffect(() => {
+    if (mutationBoundaryRef.current.update(pharmacy?.id || '', mutationsAllowed)) setIsSubmitting(false);
+    if (!mutationsAllowed) {
+      setIsCreateModalOpen(false);
+      setEditingCustomer(null);
+    }
+  }, [pharmacy?.id, mutationsAllowed]);
+
+  useEffect(() => () => mutationBoundaryRef.current.invalidate(), []);
 
   // 1. Load Customers
   const loadCustomersList = useCallback(async (pharmacyId: string, search?: string) => {
@@ -105,6 +117,7 @@ export const CustomersView: React.FC = () => {
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
+    if (!mutationsAllowed) return;
     setEditingCustomer(null);
     setFormName('');
     setFormPhone('');
@@ -117,6 +130,7 @@ export const CustomersView: React.FC = () => {
 
   // Open Edit Modal
   const handleOpenEditModal = (c: Customer) => {
+    if (!mutationsAllowed) return;
     setEditingCustomer(c);
     setFormName(c.name);
     setFormPhone(c.phone || '');
@@ -130,7 +144,8 @@ export const CustomersView: React.FC = () => {
   // Save Customer (Create / Edit)
   const handleSubmitCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pharmacy?.id) return;
+    const mutationToken = mutationBoundaryRef.current.begin();
+    if (!pharmacy?.id || !mutationToken) return;
 
     setIsSubmitting(true);
     setErrorMessage(null);
@@ -144,6 +159,7 @@ export const CustomersView: React.FC = () => {
           address: formAddress || null,
           notes: formNotes || null
         });
+        if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
 
         if (!res.success) {
           setErrorMessage(res.error || 'Failed to update customer');
@@ -160,6 +176,7 @@ export const CustomersView: React.FC = () => {
           address: formAddress || null,
           notes: formNotes || null
         });
+        if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
 
         if (!res.success) {
           setErrorMessage(res.error || 'Failed to create customer');
@@ -172,10 +189,11 @@ export const CustomersView: React.FC = () => {
       setIsCreateModalOpen(false);
       loadCustomersList(pharmacy.id, searchQuery);
     } catch (err: unknown) {
+      if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
       const msg = err instanceof Error ? err.message : 'Error saving customer';
       setErrorMessage(msg);
     } finally {
-      setIsSubmitting(false);
+      if (mutationBoundaryRef.current.accepts(mutationToken)) setIsSubmitting(false);
     }
   };
 
@@ -210,6 +228,11 @@ export const CustomersView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {!mutationsAllowed && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200" role="status">
+          Advisory subscription containment: customer history remains available, but customer creation and editing are disabled. Server authorization remains authoritative.
+        </div>
+      )}
       {/* Top Banner & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 shadow-lg">
         <div className="flex items-center gap-3">
@@ -231,9 +254,9 @@ export const CustomersView: React.FC = () => {
 
         <button
           onClick={handleOpenCreateModal}
-          disabled={!isOnline()}
+          disabled={!isOnline() || !mutationsAllowed}
           className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition cursor-pointer self-start sm:self-auto"
-          title={isOnline() ? 'Register Customer' : 'Network connection required to register new customers'}
+          title={!mutationsAllowed ? 'Subscription policy currently blocks customer mutations' : isOnline() ? 'Register Customer' : 'Network connection required to register new customers'}
         >
           <Plus className="w-4 h-4" />
           <span>Register Customer</span>
@@ -374,7 +397,7 @@ export const CustomersView: React.FC = () => {
       )}
 
       {/* Customer Create / Edit Modal */}
-      {isCreateModalOpen && (
+      {mutationsAllowed && isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">

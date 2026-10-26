@@ -42,6 +42,13 @@ export interface SaleLineItem {
 
 export interface CreateSaleInput {
   client_op_id?: string;
+  checkout_intent_id?: string;
+  sale_id?: string;
+  client_created_at?: number;
+  checkout_scope_key?: string;
+  checkout_revision?: number;
+  /** Explicitly isolates pre-Phase-B synthetic/domain callers from production checkout persistence. */
+  compatibility_non_draft?: true;
   pharmacy_id: string;
   branch_id: string;
   cashier_id: string; // Must be authenticated user UUID
@@ -70,6 +77,7 @@ export interface SaleTotals {
 export interface Sale {
   id: string;
   client_op_id: string;
+  checkout_intent_id: string;
   pharmacy_id: string;
   branch_id: string;
   cashier_id: string;
@@ -103,5 +111,6 @@ export interface CreateSaleResult {
   sale?: Sale;
   transaction?: LocalTransaction;
   queueItem?: SyncQueueItem;
+  checkoutRevision?: number;
   errors?: SaleValidationError[];
 }

@@ -50,6 +50,8 @@ async function runSalesTestSuite() {
   };
 
   const baseSaleInput: CreateSaleInput = {
+    compatibility_non_draft: true,
+    checkout_intent_id: '88888888-8888-4888-8888-888888888888',
     pharmacy_id: pharmacyA,
     branch_id: branchA,
     cashier_id: cashierA,
@@ -134,6 +136,15 @@ async function runSalesTestSuite() {
   const validRes = validateSaleInput(baseSaleInput);
   assert(validRes.isValid && validRes.errors.length === 0, 'Clean valid sale passes validation with 0 errors');
 
+  const invalidCheckoutSale = await createLocalSale({
+    ...baseSaleInput,
+    checkout_intent_id: 'not-a-uuid'
+  }, indexedDB);
+  assert(
+    invalidCheckoutSale.success === false && Boolean(invalidCheckoutSale.errors?.some((error) => error.code === 'INVALID_CHECKOUT_INTENT_ID')),
+    'Invalid checkout_intent_id is rejected before local persistence'
+  );
+
   // --- 2. CALCULATIONS TESTS ---
   console.log('\n[2. Deterministic Money Calculations]');
 
@@ -190,6 +201,12 @@ async function runSalesTestSuite() {
 
   const createRes = await createLocalSale(baseSaleInput, indexedDB);
   assert(createRes.success === true, 'createLocalSale succeeded');
+  const frozenCreatedAt = 1700000000123;
+  const frozenTimeSale = await createLocalSale({ ...baseSaleInput, client_op_id: crypto.randomUUID(),
+    sale_id: crypto.randomUUID(), checkout_intent_id: crypto.randomUUID(), client_created_at: frozenCreatedAt }, indexedDB);
+  const frozenTimeRead = await getLocalSale(pharmacyA, frozenTimeSale.sale!.client_op_id, indexedDB);
+  assert(frozenTimeRead?.created_at === frozenCreatedAt,
+    'local sale reader preserves the frozen sale creation time instead of transaction persistence time');
   assert(Boolean(createRes.sale?.id), 'Sale received unique primary ID');
   assert(Boolean(createRes.sale?.client_op_id), 'Sale received client_op_id');
   assert(createRes.transaction?.status === 'PENDING', 'Persisted transaction is initially PENDING');
@@ -299,6 +316,9 @@ async function runSalesTestSuite() {
           JSON.stringify({
             success: true,
             operation_status: 'COMMITTED',
+            client_op_id: createRes.sale!.client_op_id,
+            sale_id: createRes.sale!.id,
+            checkout_intent_id: createRes.sale!.checkout_intent_id,
             new_stock: 50,
             deficit_created: false,
             processed_at: new Date().toISOString()
@@ -338,6 +358,7 @@ async function runSalesTestSuite() {
   const multiBatchB = 'bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb';
 
   const multiLineSaleInput: CreateSaleInput = {
+    compatibility_non_draft: true,
     pharmacy_id: pharmacyA,
     branch_id: branchA,
     cashier_id: cashierA,
@@ -377,8 +398,8 @@ async function runSalesTestSuite() {
   const tamperedLine2Hash = await sha256Hex(canonicalizeJson(tamperedLine2Payload));
   assert(tamperedLine2Hash !== storedHash, 'Modifying Line 2 quantity alters canonical payload hash');
 
-  // End-to-end gateway execution: dispatch through SyncDispatcher into real Phase 5C executeGatewayPipeline
-  const gatewayState = { processed: false, ingestedPayload: null as any };
+  // End-to-end gateway execution: dispatch through SyncDispatcher into the unified commit path.
+  const gatewayState = { processed: false, committedParams: null as any };
 
   const realGatewayDispatcher = new SyncDispatcher(
     {
@@ -391,7 +412,7 @@ async function runSalesTestSuite() {
           body: init?.body
         });
 
-        // Pass directly to the authentic Phase 5C executeGatewayPipeline
+        // Pass directly to the authenticated unified sale gateway pipeline.
         const gatewayResponse = await executeGatewayPipeline(req, {
           getUser: async () => ({ user: { id: cashierA } as any, error: null }),
           getPharmacyMember: async () => ({ status: 'ACTIVE' } as any),
@@ -401,15 +422,24 @@ async function runSalesTestSuite() {
             branch_id: branchA,
             public_key_pem: deviceIdentity.publicKeyPem
           } as any),
-          consumeNonce: async () => true,
+          consumeNonce: async () => {
+            throw new Error('Legacy nonce consumption must not be used for unified sales');
+          },
           ingestStock: async (params) => {
+            throw new Error(`Legacy stock ingest must not be used for unified sales: ${params.client_op_id}`);
+          },
+          commitSale: async (params) => {
             gatewayState.processed = true;
-            gatewayState.ingestedPayload = params;
+            gatewayState.committedParams = params;
+            const processedAt = new Date().toISOString();
             return {
               operation_status: 'COMMITTED',
-              new_stock: 42,
-              deficit_created: false,
-              processed_at: new Date().toISOString()
+              sale_id: String(params.sale.id),
+              processed_at: processedAt,
+              response_payload: {
+                operation_status: 'COMMITTED', client_op_id: params.client_op_id,
+                sale_id: params.sale.id, checkout_intent_id: params.checkout_intent_id, processed_at: processedAt
+              }
             };
           }
         });
@@ -426,10 +456,11 @@ async function runSalesTestSuite() {
     'mock-session-jwt'
   );
 
-  assert(realGatewayResult.status === 'COMMITTED', 'Phase 5C executeGatewayPipeline returned HTTP 200 COMMITTED for multi-line sale');
-  assert(gatewayState.processed === true, 'Phase 5C pipeline verified signature, validated payload hash, consumed nonce, and invoked ingestStock');
-  assert(gatewayState.ingestedPayload.sale_id === multiSaleRes.sale?.id, 'Gateway ingestStock received exact sale_id');
-  assert(gatewayState.ingestedPayload.payload_hash === multiSaleRes.transaction?.payload_hash, 'Gateway received exact payload_hash covering all line items');
+  assert(realGatewayResult.status === 'COMMITTED', 'Unified executeGatewayPipeline returned HTTP 200 COMMITTED for multi-line sale');
+  assert(gatewayState.processed === true, 'Unified pipeline verified signature and invoked the atomic commit contract');
+  assert(gatewayState.committedParams.sale.id === multiSaleRes.sale?.id, 'Unified commit received exact sale_id');
+  assert(gatewayState.committedParams.payload_hash === multiSaleRes.transaction?.payload_hash, 'Unified commit received exact payload_hash covering all line items');
+  assert(gatewayState.committedParams.items.length === 2, 'Unified commit received every sale line item');
 
   closeOfflineDb();
 

@@ -30,6 +30,10 @@ import { CashReconciliationView } from './cash/CashReconciliationView';
 import { SuppliersView } from './suppliers/SuppliersView';
 import { ReportsView } from './reports/ReportsView';
 import { DeviceManagementView } from './devices/DeviceManagementView';
+import { resolveSubscriptionLifecycle } from '../lib/subscription/lifecycle';
+import { StaffInvitationForm } from './StaffInvitationForm';
+
+type WorkspaceTab = 'pos' | 'inventory' | 'sales' | 'customers' | 'suppliers' | 'reconciliation' | 'reports' | 'devices' | 'overview';
 
 export const AuthenticatedShell: React.FC = () => {
   const { 
@@ -46,7 +50,9 @@ export const AuthenticatedShell: React.FC = () => {
   } = useAuth();
 
   const [switcherOpen, setSwitcherOpen] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'pos' | 'inventory' | 'sales' | 'customers' | 'suppliers' | 'reconciliation' | 'reports' | 'devices' | 'overview'>('pos');
+  const [invitationOpen, setInvitationOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('pos');
+  const subscriptionLifecycle = resolveSubscriptionLifecycle(subscription);
 
   const canViewReports = role === 'OWNER' || role === 'MANAGER' || role === 'PHARMACIST' || permissions.includes('reports.read');
 
@@ -277,6 +283,14 @@ export const AuthenticatedShell: React.FC = () => {
           </div>
 
           <button
+            onClick={() => setInvitationOpen((open) => !open)}
+            className="px-2.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 text-xs font-semibold transition"
+            title="Accept an invitation to another pharmacy"
+          >
+            Join pharmacy
+          </button>
+
+          <button
             onClick={() => signOut()}
             className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition"
             title="Sign Out"
@@ -286,24 +300,39 @@ export const AuthenticatedShell: React.FC = () => {
         </div>
       </header>
 
+      {invitationOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label="Accept staff invitation">
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+            <StaffInvitationForm onAccepted={() => setInvitationOpen(false)} />
+            <button type="button" onClick={() => setInvitationOpen(false)} className="mt-3 w-full rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300">Close</button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
+        <div className={`mb-5 rounded-xl border p-4 text-xs ${subscriptionLifecycle.mutationAllowed ? 'border-sky-500/20 bg-sky-500/10 text-sky-200' : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}`} role="status">
+          <strong>{subscriptionLifecycle.state}</strong>: {subscriptionLifecycle.reason} This client check is advisory containment; the server must enforce entitlement using trusted time. Previously accepted offline operations remain available to the sync/recovery path.
+        </div>
         {activeTab === 'pos' ? (
-          <PosView />
+          <PosView newSaleAllowed={subscriptionLifecycle.capabilities.createSale} />
         ) : activeTab === 'inventory' ? (
-          <InventoryView />
+          <InventoryView mutationsAllowed={subscriptionLifecycle.capabilities.mutateInventory} />
         ) : activeTab === 'sales' ? (
-          <SalesView />
+          <SalesView refundRestockAllowed={subscriptionLifecycle.capabilities.createRefundOrRestock} />
         ) : activeTab === 'customers' ? (
-          <CustomersView />
+          <CustomersView mutationsAllowed={subscriptionLifecycle.capabilities.mutateCustomers} />
         ) : activeTab === 'suppliers' ? (
-          <SuppliersView />
+          <SuppliersView mutationsAllowed={subscriptionLifecycle.capabilities.mutateSuppliers} />
         ) : activeTab === 'reconciliation' ? (
-          <CashReconciliationView />
+          <CashReconciliationView
+            openShiftAllowed={subscriptionLifecycle.capabilities.openCashShift}
+            reconcileExistingShiftAllowed={subscriptionLifecycle.capabilities.reconcileExistingCashShift}
+          />
         ) : activeTab === 'reports' ? (
           <ReportsView />
         ) : activeTab === 'devices' ? (
-          <DeviceManagementView />
+          <DeviceManagementView enrollmentAllowed={subscriptionLifecycle.capabilities.enrollDevice} />
         ) : (
           <>
             {/* Welcome Banner */}

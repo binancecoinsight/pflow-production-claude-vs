@@ -9,6 +9,7 @@ import {
   clearCart,
   finalizePosSale,
   checkCatalogFreshness,
+  loadOrCreateDurableCart,
   PosSessionContext
 } from './index';
 import { replacePharmacyInventorySnapshot, InventorySnapshot } from '../inventory/index';
@@ -308,13 +309,13 @@ async function runPosTestSuite() {
   console.log('\n[7. Offline Sale Finalization]');
 
   // Construct a realistic multi-line cart
-  let saleCart = createCart(contextA);
+  let saleCart = await loadOrCreateDurableCart(contextA, indexedDB);
   saleCart = await addItemToCart(saleCart, { product_id: prodA1, quantity: 2 }, indexedDB); // 2 * 1000 = 2000
   saleCart = await addItemToCart(saleCart, { product_id: prodA2, quantity: 4, discount: 400, tax: 100 }, indexedDB); // 4 * 2500 = 10000 - 400 + 100 = 9700
   saleCart = setCartDiscountsAndTaxes(saleCart, 500, 200);
 
   // Reject finalization on empty cart
-  const emptyCartRes = await finalizePosSale(createCart(contextA), { payment_method: 'CASH' }, indexedDB);
+  const emptyCartRes = await finalizePosSale(clearCart(saleCart), { payment_method: 'CASH' }, indexedDB);
   assert(emptyCartRes.success === false, 'Finalizing empty cart is rejected');
   assert(Boolean(emptyCartRes.errors?.[0]?.includes('Cart is empty')), 'Reports empty cart error');
 
@@ -351,9 +352,9 @@ async function runPosTestSuite() {
     { payment_method: 'CASH', client_op_id: customOpId },
     indexedDB
   );
-  assert(customIdRes.success === true, 'Finalized with explicit client_op_id');
-  assert(customIdRes.sale?.client_op_id === customOpId, 'Sale client_op_id preserved');
-  assert(customIdRes.transaction?.client_op_id === customOpId, 'Transaction client_op_id preserved');
+  assert(customIdRes.success === false, 'Caller cannot replace the checkout-reserved client_op_id');
+  assert(finalizeRes.sale?.client_op_id === saleCart.client_op_id, 'Sale preserves the checkout-reserved client_op_id');
+  assert(finalizeRes.transaction?.client_op_id === saleCart.client_op_id, 'Transaction preserves the checkout-reserved client_op_id');
 
   // Duplicate client_op_id in same pharmacy is rejected by idempotency guard
   const duplicateRes = await finalizePosSale(

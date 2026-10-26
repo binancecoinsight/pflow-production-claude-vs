@@ -12,7 +12,8 @@
 
 import { PosCart, FinalizeSaleOptions, FinalizeSaleResult, CatalogFreshnessStatus } from './types';
 import { ALLOWED_PAYMENT_METHODS, CreateSaleInput } from '../sales/types';
-import { createLocalSale } from '../sales/service';
+import { createLocalSale, getExistingDurableCheckoutSale } from '../sales/service';
+import { ensureDurableCartReservation } from './drafts';
 import {
   getProductById,
   getBatchesForProduct,
@@ -83,7 +84,34 @@ export const finalizePosSale = async (
     }
   }
 
-  // 2. Cart Content Validation
+  if (options.client_op_id && !isValidUuid(options.client_op_id)) {
+    errors.push(`Invalid client_op_id: ${options.client_op_id}`);
+  } else if (options.client_op_id && options.client_op_id.toLowerCase().trim() !== cart.client_op_id) {
+    errors.push('client_op_id is already reserved by the durable checkout and cannot be replaced');
+  }
+
+  if (errors.length > 0) return { success: false, errors };
+
+  // A prior attempt may have frozen successfully before the UI observed the result. Retrieve it
+  // after identity/session checks but before mutable cart, customer, payment or catalog validation.
+  try {
+    const existing = await getExistingDurableCheckoutSale({
+      scope_key: cart.checkout_scope_key,
+      checkout_intent_id: cart.checkout_intent_id,
+      client_op_id: cart.client_op_id,
+      sale_id: cart.sale_id,
+      pharmacy_id: cart.pharmacy_id
+    }, customFactory);
+    if (existing) return {
+      success: true, sale: existing.sale, transaction: existing.transaction,
+      queueItem: existing.queueItem, checkoutRevision: existing.checkoutRevision
+    };
+    await ensureDurableCartReservation(cart, customFactory);
+  } catch (error: unknown) {
+    return { success: false, errors: [error instanceof Error ? error.message : 'Durable checkout recovery failed'] };
+  }
+
+  // 2. Mutable Cart Content Validation
   if (!Array.isArray(cart.line_items) || cart.line_items.length === 0) {
     errors.push('Cart is empty: at least one line item is required to finalize sale');
   }
@@ -91,10 +119,6 @@ export const finalizePosSale = async (
   // 3. Payment Method Validation
   if (!ALLOWED_PAYMENT_METHODS.includes(options.payment_method)) {
     errors.push(`Invalid payment method: ${options.payment_method}. Allowed: ${ALLOWED_PAYMENT_METHODS.join(', ')}`);
-  }
-
-  if (options.client_op_id && !isValidUuid(options.client_op_id)) {
-    errors.push(`Invalid client_op_id: ${options.client_op_id}`);
   }
 
   if (options.customer_id && !isValidUuid(options.customer_id)) {
@@ -157,7 +181,12 @@ export const finalizePosSale = async (
 
   // 5. Build CreateSaleInput for Phase 5D-3 local sales engine
   const saleInput: CreateSaleInput = {
-    client_op_id: options.client_op_id,
+    client_op_id: options.client_op_id || cart.client_op_id,
+    checkout_intent_id: cart.checkout_intent_id,
+    sale_id: cart.sale_id,
+    client_created_at: cart.client_created_at,
+    checkout_scope_key: cart.checkout_scope_key,
+    checkout_revision: cart.draft_revision,
     pharmacy_id: cart.pharmacy_id,
     branch_id: cart.branch_id,
     cashier_id: cart.cashier_id,
@@ -194,7 +223,8 @@ export const finalizePosSale = async (
       success: true,
       sale: saleResult.sale,
       transaction: saleResult.transaction,
-      queueItem: saleResult.queueItem
+      queueItem: saleResult.queueItem,
+      checkoutRevision: saleResult.checkoutRevision
     };
   } catch (err: any) {
     return {

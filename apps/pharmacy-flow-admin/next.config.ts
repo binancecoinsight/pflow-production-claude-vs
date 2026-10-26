@@ -1,7 +1,14 @@
 import type {NextConfig} from 'next';
+import {fileURLToPath} from 'node:url';
+
+const adminAppRoot = fileURLToPath(new URL('.', import.meta.url));
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The repository and user profile contain multiple lockfiles. Keep standalone
+  // tracing inside this Admin Support application instead of allowing Next.js
+  // to infer a parent directory outside the PharmacyFlow workspace.
+  outputFileTracingRoot: adminAppRoot,
   eslint: {
     ignoreDuringBuilds: true,
   },

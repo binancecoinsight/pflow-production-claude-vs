@@ -23,6 +23,7 @@ interface SaleDetailModalProps {
   sale: HistoricalSale | null;
   currency: string;
   role?: string | null;
+  refundRestockAllowed?: boolean;
   onClose: () => void;
   onInitiateReturn?: () => void;
   onViewReceipt?: () => void;
@@ -32,6 +33,7 @@ export const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
   sale,
   currency,
   role,
+  refundRestockAllowed = true,
   onClose,
   onInitiateReturn,
   onViewReceipt
@@ -40,7 +42,8 @@ export const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
 
   const isServerCommitted = sale.provenance === 'SERVER_COMMITTED';
   const isPending = sale.provenance === 'LOCAL_PENDING';
-  const canReturn = isServerCommitted && canUserProcessReturns(role);
+  const roleCanReturn = isServerCommitted && canUserProcessReturns(role);
+  const canReturn = roleCanReturn && refundRestockAllowed;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
@@ -258,7 +261,9 @@ export const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
                 disabled
                 className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-500 text-xs font-medium border border-slate-700/60 flex items-center gap-1.5 cursor-not-allowed opacity-60"
                 title={
-                  isPending
+                  !refundRestockAllowed
+                    ? 'Subscription policy permits historical review but not a new refund/restock mutation'
+                    : isPending
                     ? 'Pending offline sales cannot be returned until synced with server'
                     : 'Returns require Manager, Owner, or Pharmacist authorization'
                 }

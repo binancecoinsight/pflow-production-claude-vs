@@ -9,16 +9,22 @@ import { QueueState, SyncQueueItem } from './types';
 
 // Map of allowed origin states to their valid target states
 const ALLOWED_TRANSITIONS: Record<QueueState, readonly QueueState[]> = {
-  PENDING: ['SYNCING', 'PERMANENT_FAILURE'],
+  PENDING: ['SYNCING', 'RECOVERY_REQUIRED', 'PERMANENT_FAILURE'],
   SYNCING: [
     'SYNCING',
     'COMMITTED',
     'RETRYABLE',
+    'UNCERTAIN',
+    'RECOVERY_REQUIRED',
+    'CONFLICT',
     'PERMANENT_FAILURE',
     'AUTH_REQUIRED',
     'DEVICE_BLOCKED'
   ],
-  RETRYABLE: ['SYNCING', 'PERMANENT_FAILURE'],
+  RETRYABLE: ['SYNCING', 'RECOVERY_REQUIRED', 'PERMANENT_FAILURE'],
+  UNCERTAIN: ['COMMITTED', 'RETRYABLE', 'UNCERTAIN', 'CONFLICT'],
+  RECOVERY_REQUIRED: [],
+  CONFLICT: [],
   AUTH_REQUIRED: ['RETRYABLE', 'SYNCING'],
   DEVICE_BLOCKED: ['RETRYABLE'], // Recoverable only if unblocked
   PERMANENT_FAILURE: [], // Terminal

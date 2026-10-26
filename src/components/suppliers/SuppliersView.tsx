@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   Building2, 
   Search, 
@@ -34,13 +34,14 @@ import {
 } from '../../lib/suppliers/service';
 import { SupplierModal } from './SupplierModal';
 import { formatMinorUnits, formatDate } from '../pos/formatters';
+import { CapabilityAsyncBoundary } from '../../lib/subscription/capabilityBoundary';
 
-export const SuppliersView: React.FC = () => {
+export const SuppliersView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutationsAllowed = true }) => {
   const { pharmacy, branch, role, permissions } = useAuth();
 
   // Role permissions
   const isOwner = role === 'OWNER';
-  const canManageSuppliers = isOwner || role === 'MANAGER' || role === 'PHARMACIST' || permissions.includes('purchases.manage');
+  const canManageSuppliers = mutationsAllowed && (isOwner || role === 'MANAGER' || role === 'PHARMACIST' || permissions.includes('purchases.manage'));
   const canViewPurchases = isOwner || role === 'MANAGER' || role === 'PHARMACIST' || permissions.includes('purchases.manage') || permissions.includes('reports.financial');
 
   // Active view tab: 'directory' | 'purchases'
@@ -74,6 +75,7 @@ export const SuppliersView: React.FC = () => {
   const [purchaseItems, setPurchaseItems] = useState<PurchaseAuditItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState<boolean>(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
+  const mutationBoundaryRef = useRef(new CapabilityAsyncBoundary('', mutationsAllowed));
 
   // Load suppliers
   const loadSuppliers = useCallback(async () => {
@@ -123,6 +125,16 @@ export const SuppliersView: React.FC = () => {
   }, [loadSuppliers]);
 
   useEffect(() => {
+    if (mutationBoundaryRef.current.update(pharmacy?.id || '', mutationsAllowed)) setIsDeleting(false);
+    if (mutationsAllowed) return;
+    setIsModalOpen(false);
+    setEditingSupplier(null);
+    setDeletingSupplier(null);
+  }, [pharmacy?.id, mutationsAllowed]);
+
+  useEffect(() => () => mutationBoundaryRef.current.invalidate(), []);
+
+  useEffect(() => {
     if (activeTab === 'purchases' && canViewPurchases) {
       loadPurchases();
     }
@@ -153,12 +165,14 @@ export const SuppliersView: React.FC = () => {
 
   // Handle supplier delete execution
   const handleExecuteDelete = async () => {
-    if (!pharmacy?.id || !deletingSupplier) return;
+    const mutationToken = mutationBoundaryRef.current.begin();
+    if (!pharmacy?.id || !deletingSupplier || !mutationToken) return;
     setIsDeleting(true);
     setDeleteError(null);
 
     try {
       const res = await deleteSupplier(supabase, pharmacy.id, deletingSupplier.id);
+      if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
       if (res.success) {
         setSupplierSuccess(`Supplier "${deletingSupplier.name}" permanently deleted.`);
         setDeletingSupplier(null);
@@ -168,10 +182,11 @@ export const SuppliersView: React.FC = () => {
         setDeleteError(res.error || 'Failed to delete supplier');
       }
     } catch (err: unknown) {
+      if (!mutationBoundaryRef.current.accepts(mutationToken)) return;
       const msg = err instanceof Error ? err.message : 'Error executing supplier deletion';
       setDeleteError(msg);
     } finally {
-      setIsDeleting(false);
+      if (mutationBoundaryRef.current.accepts(mutationToken)) setIsDeleting(false);
     }
   };
 
@@ -190,6 +205,11 @@ export const SuppliersView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {!mutationsAllowed && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200" role="status">
+          Advisory subscription containment: supplier and purchase history remain readable, but supplier mutations are disabled. Server authorization remains authoritative.
+        </div>
+      )}
       {/* Header Banner */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-900/90 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -586,13 +606,14 @@ export const SuppliersView: React.FC = () => {
       {/* MODAL 1: CREATE / EDIT SUPPLIER */}
       {isModalOpen && pharmacy?.id && (
         <SupplierModal
-          isOpen={isModalOpen}
+          isOpen={mutationsAllowed && isModalOpen}
           onClose={() => {
             setIsModalOpen(false);
             setEditingSupplier(null);
           }}
           pharmacyId={pharmacy.id}
           editingSupplier={editingSupplier}
+          mutationsAllowed={mutationsAllowed}
           onSuccess={(savedSupplier) => {
             setSupplierSuccess(
               editingSupplier
@@ -606,7 +627,7 @@ export const SuppliersView: React.FC = () => {
       )}
 
       {/* MODAL 2: PERMANENT DELETE SUPPLIER CONFIRMATION (OWNER ONLY) */}
-      {deletingSupplier && (
+      {mutationsAllowed && deletingSupplier && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div 
             className="w-full max-w-md rounded-2xl bg-slate-900 border border-rose-500/30 shadow-2xl overflow-hidden p-6"
