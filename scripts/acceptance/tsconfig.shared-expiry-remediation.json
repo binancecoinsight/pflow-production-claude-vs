@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "../../src/lib/inventory/expiry.ts",
+    "../../src/lib/inventory/validation.ts",
+    "../../src/lib/inventory/service.ts",
+    "../../src/lib/inventory/sharedExpiryRemediation.test.ts",
+    "../../src/lib/inventory/sharedExpiryProductionPaths.test.tsx",
+    "../../src/lib/pos/cart.ts",
+    "../../src/lib/pos/orchestrator.ts",
+    "../../src/components/inventory/InventoryView.tsx",
+    "../../src/components/inventory/ProductDetailModal.tsx"
+  ]
+}

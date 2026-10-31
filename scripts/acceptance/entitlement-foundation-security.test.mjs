@@ -1,0 +1,20 @@
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+let passed = 0;
+const assert = (condition, message) => { if (!condition) throw new Error(`FAIL: ${message}`); passed += 1; };
+const read = (path) => readFileSync(path, 'utf8');
+const hash = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+const proposal = read('supabase/migrations/20261029000036_entitlement_foundation_security_closure_v1.sql');
+
+assert(hash('supabase/migrations/20261029000035_server_authoritative_entitlement_v1.sql') === '46a285069ea3a29b4e8c73ea3e8148f890b6e692df7581ce9c8ac8ebb5d8fb64', 'sealed migration 000035 bytes are preserved');
+assert(hash('docs/development/MVP02_CLOSE_CORRECTION_PF-SUP-2026-10-29-02.sha256') === 'be600c1f53aa4ca508b0162694af278f2b8f5568ef9ddf121cf6eb789cefef1f', 'accepted inventory manifest is preserved');
+assert(hash('src/lib/inventory/service.ts') === '3bb0bc0fd47007a12553ad75767fab821bb0dc9acfb6ee20776e0c5151b40137', 'accepted inventory service is preserved');
+assert(hash('src/lib/inventory/validation.ts') === '7c7bb6df87ff7bb781de9aee7a7439c11ebcdce2c91e6a30dd64ff4e120f5217', 'accepted inventory validation is preserved');
+assert(hash('src/lib/pos/orchestrator.ts') === 'c11edc1c7bbbf91b9326530441af63cdf7f06625d8a0d11cc4ffb45181dd5a6c', 'accepted POS orchestrator is preserved');
+assert(proposal.includes("operation_kind IN ('SALE_COMMIT'"), 'proposal uses a closed operation-kind allowlist');
+assert(proposal.includes('client_operation_id') && proposal.includes('payload_fingerprint') && proposal.includes('actor_id') && proposal.includes('device_id'), 'replay evidence binds client identity, fingerprint, actor, and device');
+assert(proposal.includes("e.outcome = 'COMMITTED'") && proposal.includes('domain_entity_id <> e.client_operation_id'), 'replay accepts only committed evidence and rejects domain-id substitution');
+assert(proposal.includes('ORDER BY d.effective_at DESC, d.decision_sequence DESC, d.id DESC'), 'administrative decisions have deterministic timezone-independent ordering');
+assert(proposal.includes('REVOKE ALL ON FUNCTION public.authorize_exact_entitlement_replay_v2') && !proposal.includes('GRANT EXECUTE'), 'foundation helpers are not exposed or wired to application roles');
+assert(!proposal.includes('rpc_commit_sale_v1(') && !proposal.includes('rpc_process_sale_return_v2(') && !proposal.includes('rpc_receive_inventory_stock('), 'proposal does not modify or wire protected business RPCs');
+console.log(`Entitlement foundation static assertions: ${passed} passed`);

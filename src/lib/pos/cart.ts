@@ -6,12 +6,14 @@
  */
 
 import { PosCart, PosCartLineItem, PosSessionContext, AddItemInput } from './types';
+import type { LocalBatch } from '../inventory/types';
 import {
   getProductById,
   getBatchesForProduct,
   getEligibleBatchesForProduct,
   selectRecommendedBatch,
-  computeExpiryInfo
+  computeExpiryInfo,
+  InvalidInventoryDateError
 } from '../inventory/index';
 import { checkoutScopeKey } from '../offline/db';
 
@@ -21,6 +23,10 @@ const isValidUuid = (value: unknown): boolean => {
   if (typeof value !== 'string') return false;
   return UUID_REGEX.test(value.trim());
 };
+
+const invalidExpirySelectionError = (): Error => new Error(
+  'Batch expiry evidence is invalid; the item was not added',
+);
 
 /**
  * Recalculates all cart totals in integer minor units.
@@ -209,7 +215,13 @@ export const addItemToCart = async (
     }
 
     // Expiry check
-    const expiry = computeExpiryInfo(matchedBatch.expiry_date);
+    let expiry;
+    try {
+      expiry = computeExpiryInfo(matchedBatch.expiry_date);
+    } catch (error: unknown) {
+      if (error instanceof InvalidInventoryDateError) throw invalidExpirySelectionError();
+      throw error;
+    }
     if (expiry.is_expired) {
       throw new Error(`Batch ${matchedBatch.batch_number} expired on ${matchedBatch.expiry_date} and cannot be sold`);
     }
@@ -221,14 +233,19 @@ export const addItemToCart = async (
     projectedStock = matchedBatch.projected_stock;
   } else {
     // Auto-select batch using Phase 5D-4 provisional recommendation
-    const eligibleBatches = await getEligibleBatchesForProduct(
-      cart.pharmacy_id,
-      product.id,
-      { branchId: cart.branch_id },
-      customFactory
-    );
-
-    const recommended = selectRecommendedBatch(eligibleBatches);
+    let recommended: LocalBatch | null;
+    try {
+      const eligibleBatches = await getEligibleBatchesForProduct(
+        cart.pharmacy_id,
+        product.id,
+        { branchId: cart.branch_id },
+        customFactory
+      );
+      recommended = selectRecommendedBatch(eligibleBatches);
+    } catch (error: unknown) {
+      if (error instanceof InvalidInventoryDateError) throw invalidExpirySelectionError();
+      throw error;
+    }
     if (!recommended) {
       throw new Error(`No eligible non-expired batches found for product ${product.name} in branch ${cart.branch_id}`);
     }

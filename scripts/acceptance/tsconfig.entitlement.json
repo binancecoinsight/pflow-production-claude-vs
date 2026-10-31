@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "../../src/lib/subscription/capabilities.ts",
+    "../../src/lib/subscription/lifecycle.ts",
+    "../../src/lib/subscription/lifecycle.test.ts",
+    "../../src/lib/subscription/capabilityBoundary.ts",
+    "../../src/lib/subscription/capabilityBoundary.test.ts",
+    "../../src/lib/subscription/entitlementEnforcement.ts",
+    "../../src/lib/subscription/entitlementAdapter.ts",
+    "../../src/lib/subscription/foundationSecurity.ts",
+    "../../src/lib/subscription/foundationSecurity.test.ts",
+    "../../src/lib/subscription/entitlement.test.ts",
+    "../../src/lib/subscription/index.ts"
+  ]
+}

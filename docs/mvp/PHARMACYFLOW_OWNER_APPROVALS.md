@@ -1,5 +1,37 @@
 # PharmacyFlow owner approvals and authority register
 
+## PF-SUP-2026-10-31-03 local native-client correction authority
+
+The owner authorized local harness/test/document corrections for native-client conformance and final execution-gate handoff. This authority covers isolated adapters, transcript tests, inventory/review evidence and current records only. It excludes every database/SQL/RPC/Auth/provider/browser/network/service/credential/Git/provisioning/activation/deployment operation. Protected execution still requires a separate owner instruction; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-31-02 local conformance-correction authority
+
+The owner authorized local harness/test/document corrections for PF-MVP-10 emitter/consumer conformance closure. This includes the acceptance SQL emitter correction, consumer policy, controlled coordinator rehearsal, inventory/evidence refresh and no protected execution. Application/security source, protected migrations and historical manifests remain preserved. All external/protected operations, AUTH-02, direct-table enforcement and environment destruction remain unauthorized.
+
+## PF-SUP-2026-10-31-01 local whole-command correction authority
+
+The owner explicitly authorized local harness/test/document corrections for PF-MVP-10 whole-command acceptance closure. This authorizes the fresh execution inventory, isolated injected rehearsals and current records only. It does not authorize database/SQL/RPC/Auth/provider/browser/datastore/network/Docker/service/credential/install/Git/provisioning/activation/deployment/StoreFlow access. Migrations through 000039 and historical manifests remain preserved; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-30-06 local integration-correction authority
+
+The owner explicitly authorized local harness/test/document corrections for PF-MVP-10 production-path integration closure. This excludes application/security source, migrations 000000–000039 and every database/SQL/RPC/Auth/provider/browser/datastore/network/Docker/service/credential/install/Git/provisioning/activation/deployment/StoreFlow action. Protected execution, fixture deletion, environment destruction, AUTH-02 and direct-table enforcement remain separately gated.
+
+## PF-SUP-2026-10-30-05 local correction authority
+
+The owner explicitly authorized local harness/test/document corrections for PF-MVP-10 safety/evidence closure. This authority excludes application/security source, migrations 000000–000039 and every database/RPC/Auth/provider/browser/network/Docker/service/credential/Git/provisioning/deployment action. Cleanup, destruction, AUTH-02 and direct-table enforcement remain separately gated.
+
+## PF-MVP-10 authoring authority and execution gap
+
+The owner authorized local harness/test/document authoring only. No execution target, identity, credential, command, fixture, cleanup or destruction action is approved. The exact future request is recorded in `docs/development/PHARMACYFLOW_PF-MVP-10_OWNER_EXECUTION_AUTHORIZATION_REQUEST.md`.
+
+## PF-SUP-2026-10-30-03 entitlement contract closure scope
+
+The owner's 2026-10-30 instruction authorizes local source/test/document authoring and exactly one forward-only, unexecuted correction migration addressing refund overloads, entitlement-decision consistency, sealed fingerprint parity, focused regressions and disposable-proposal reconciliation. It does not authorize any target, identity, credential, database/SQL execution, RPC/Auth/browser/network/Docker/service operation, provisioning, activation, deployment, fixture cleanup or environment destruction. Direct-table enforcement and AUTH-02 remain separately gated.
+
+## Entitlement migration lineage repair and canonical parity - 2026-10-30
+
+Owner authorized moving, not deleting, `supabase/migrations/20261029000037_consolidated_entitlement_enforcement_v1.sql` to `docs/development/quarantined-proposals/` after byte/hash verification; authoring a uniquely versioned additive correction; implementing guarded parity wrappers from the latest sealed definitions; preserving legacy-route availability; completing trusted-caller/replay integration, focused regressions, provenance and current evidence. Explicit exclusions remain database/SQL execution, RPC, browser/datastore, network, Auth/provider, credentials, Docker/services, installation, Git mutation, provisioning, activation, deployment and StoreFlow. Disposable execution requires separate authorization; AUTH-02 remains deferred.
+
 ## Review evidence and I3A owner scope — 2026-10-26
 
 The current owner message explicitly authorizes review-evidence reconciliation and I3A **design only**. Owner-supplied transcript evidence states: PF-SUP-02 accepted corrected-I2 source/synthetic suitability for bounded I3 local authoring subject to separate owner approval; PF-SUP-05 passed I3 boundary/parity locally; PF-SUP-06 confirmed unchanged implementation hashes and identified the missing repository review export. These are attributed transcript dispositions, not reconstructed review details.
@@ -91,6 +123,8 @@ The later owner message `PHARMACYFLOW — ACC-01 SAFETY AND COVERAGE CORRECTION`
 
 The owner message `PHARMACYFLOW — ACC-01 EXECUTION-FIDELITY CORRECTION` explicitly authorizes the bounded local PF-SUP-2026-10-26-10 harness correction, focused pure/injected/static/compiler/parser checks, append-only ledgers and a new manifest. It expressly withholds database/SQL/fixture/cleanup execution, network, Auth/provider, Docker/services/ports, credentials, browser storage, installation, Git mutation, provisioning, activation, deployment and StoreFlow. It does not authorize AUTH-02 and does not decide REV-LIN-01.
 
+The owner message `PHARMACYFLOW — ACC-01 TWO-POINT RUNNER CLOSURE` explicitly authorizes the narrow PF-SUP-2026-10-26-11 local correction, focused pure/injected/static/compiler/parser checks, ledger/report updates and one new manifest. It authorizes no PostgreSQL/SQL/fixture/cleanup execution, network, Auth/provider, Docker/services/ports, credentials, browser storage, installation, Git mutation, provisioning, activation, deployment or StoreFlow. AUTH-02 remains deferred and REV-LIN-01 remains undecided.
+
 ## Conflict and precedence notes
 
 - COM-01 supersedes any fixture or historical text that implies fixed commercial prices. `apps/pharmacy-flow-admin/lib/mock-data.ts` is disconnected fixture material and is not an approved product contract.
@@ -99,3 +133,55 @@ The owner message `PHARMACYFLOW — ACC-01 EXECUTION-FIDELITY CORRECTION` explic
 - The detailed decision history remains in `docs/development/PHARMACYFLOW_DECISIONS.md`; this file is the concise standing authority view for the five-milestone program.
 
 Design dispositions are recorded in `docs/mvp/PHARMACYFLOW_COMMERCIAL_ARCHITECTURE.md`; the protected execution proposal is `docs/mvp/PHARMACYFLOW_DISPOSABLE_TEST_AUTHORIZATION.md`. Neither document grants its own implementation or execution authority.
+
+## Reservation/revocation concurrency source authorization — 2026-10-26
+
+The owner message `PHARMACYFLOW — OWNER AUTHORIZATION: SOURCE-ONLY RESERVATION/REVOCATION CONCURRENCY` explicitly authorizes one bounded local harness-authoring batch from the PF-SUP-2026-10-26-12 baseline: committed fixture, both concurrency orderings, guarded cleanup source, focused local tests/docs and a manifest. It expressly prohibits database/SQL execution, target inspection, Auth/provider/network, Docker/services/ports, credentials, browser storage, installation, Git mutation, provisioning, activation, deployment, environment destruction and StoreFlow. It does not authorize AUTH-02 or decide REV-LIN-01.
+
+## REV-LIN-01 owner policy approval — 2026-10-26
+
+The owner selected transaction-entry linearization under the six stated safeguards and authorized local design/source reconciliation only from PF-SUP-2026-10-26-13. The approval permits documentation and a scoped handoff manifest, but no façade/application/security change, migration authoring/execution, provider adapter, runtime authority provisioning, database/SQL/target/credential/network/Auth/browser/Docker operation, Git mutation, activation, deployment, environment destruction or StoreFlow access.
+
+The policy decision is authoritative but is not evidence of technical enforcement. Source inspection identified a separately gated implementation correction. AUTH-02 and disposable PostgreSQL acceptance remain deferred.
+
+## REV-LIN-01 local implementation authorization — 2026-10-26
+
+Following PF-SUP-2026-10-26-14, the owner explicitly approved the exact bounded REV-LIN-01 local correction: inactive source, focused tests, documentation and one additive forward-only, unexecuted migration proposed as `000033`. Authorized requirements include fresh phase authority, immutable original-operation identity, separately audited recovery actors, applicant/context-scoped alternate recovery, fail-closed historical provenance and atomic completion/audit.
+
+The approval expressly withholds database/SQL execution, target inspection, credentials, network, Auth/provider/browser, Docker/services/ports, installation, Git mutation, provisioning, signup, activation, deployment, environment destruction and StoreFlow. AUTH-02 remains deferred. The approval is implementation-authoring authority only and is not PostgreSQL or production acceptance.
+
+## PF-SUP-2026-10-26-15 bounded security-correction authorization
+
+The owner explicitly authorized local source/test/document changes and one forward-only, unexecuted migration `000034` to close cross-principal `IDENTITY_ISSUE` routes, make injected scopes fail closed and align completed replay/correlation/audit rollback. Migrations 000027–000033 and historical manifests must remain unchanged.
+
+The authorization includes isolated synthetic/static/compiler checks only. It withholds database/SQL execution, targets, credentials, network, Auth/provider/browser, Docker/services/ports, installation, Git mutation, provisioning, signup, activation, deployment, environment destruction and StoreFlow. AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-26-16 ACC-01 source-only contract-alignment authorization
+
+The owner explicitly authorized the bounded ACC-01 harness alignment with preserved migrations `000027`–`000034`: exact hashes/signatures, disposable scope fixture source, security/replay/audit acceptance cases, coverage classifications and guarded cleanup. The authorization permits only local harness/test/document edits, authored unexecuted fixture/assertion/cleanup SQL and inspected local synthetic/static/compiler/parser checks.
+
+It does not authorize SQL/database execution, target inspection, credentials, network, Auth/provider/browser access, runtime authority provisioning, Git mutation, signup, activation, deployment, cleanup, environment destruction or StoreFlow. AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-26-17 assertion-closure authorization
+
+The owner explicitly authorized one bounded local harness/test/document batch adding retired-v2 exact-signature ACL assertions, fail-closed identity-response assertions and focused synthetic/static/compiler/parser evidence plus a new manifest. No migration authoring or execution is authorized.
+
+Database/SQL execution, target inspection, credentials, network, Auth/provider/browser, Docker/services/ports, installation, Git mutation, provisioning, activation, deployment, environment destruction and StoreFlow remain prohibited. AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-29-03 PF-MVP-08 foundation security authorization
+
+The owner authorized local source/test/document edits and one additive unexecuted SQL correction proposal for strict entitlement evidence, exact replay authorization, administrative decisions, a source-backed enforcement matrix and local checks. Existing migrations and the accepted inventory milestone must remain byte-preserved.
+
+No dependent server wiring, database/SQL execution, real RPC/browser/datastore, network, Auth/provider, credentials, Docker/services/ports, installation, Git mutation, provisioning, activation, deployment or StoreFlow access was authorized. AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-29-04 foundation acceptance completion authorization
+
+The owner authorized one cohesive local foundation correction, adversarial regression and evidence-reconciliation batch, including additive unexecuted SQL proposals. Existing migration bytes and historical manifests were to remain unchanged unless separately directed.
+
+No business-route wiring, database/SQL execution, RPC, browser/datastore, network, Auth/provider, credentials, Docker/services/ports, installation, Git mutation, provisioning, activation, deployment or StoreFlow access was authorized. AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-30-01 parity/readiness correction authorization
+
+The owner authorized local source/test/document reconciliation and additive unexecuted correction proposals. Existing migration bytes and historical manifests remain preserved. This authority does not retroactively approve artifacts labelled “PROPOSED OWNER AUTHORIZATION,” and does not authorize editing/removing/renaming the malformed competing migration.
+
+Database/SQL execution, RPC, browser/datastore, network, Auth/provider, credentials, Docker/services/ports, installation, Git mutation, provisioning, activation, deployment and StoreFlow remain prohibited. AUTH-02 remains deferred.

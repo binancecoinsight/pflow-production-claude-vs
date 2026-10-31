@@ -1,12 +1,13 @@
 param(
   [Parameter(Mandatory)][string]$AuthorizationFile,
   [Parameter(Mandatory)][string]$PackageManifest,
-  [Parameter(Mandatory)][ValidateSet('OPERATION_COLLISION_PENDING_FIRST','OPERATION_COLLISION_COMPLETED_FIRST','DURABLE_PENDING_RECOVERY','RESERVATION_REVOCATION','CONSUMPTION_REVOCATION')][string]$CaseId
+  [Parameter(Mandatory)][ValidateSet('OPERATION_COLLISION_PENDING_FIRST','OPERATION_COLLISION_COMPLETED_FIRST','RESERVATION_REVOCATION_RESERVATION_FIRST','RESERVATION_REVOCATION_REVOCATION_FIRST','DURABLE_PENDING_RECOVERY','CONSUMPTION_REVOCATION')][string]$CaseId
 )
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'preflight.ps1')
 . (Join-Path $PSScriptRoot 'evidence.ps1')
 . (Join-Path $PSScriptRoot 'process-output.ps1')
+. (Join-Path $PSScriptRoot 'runner-contract.ps1')
 . (Join-Path $PSScriptRoot 'scenarios.ps1')
 $approved=Assert-I3aPreflight -AuthorizationFile $AuthorizationFile -Command 'postgres-concurrency' -PackageManifest $PackageManifest
 $authorization=$approved.Authorization
@@ -51,7 +52,12 @@ try {
   $stale=Invoke-I3aSql "SET statement_timeout='5s'; SELECT count(*) FROM public.pf_i3a_concurrency_evidence WHERE run_id='I3A-20261026-001' AND case_id='$CaseId';"
   if($stale -cne '0'){throw 'stale concurrency evidence exists; refusing reuse'}
   if($scenario.ExecutionClassification -cne 'RPC_PRODUCTION_LOCK'){throw 'scenario is not classified for production RPC lock execution'}
-  if($scenario.SetupSql){Invoke-I3aSql (Get-GuardedSql $scenario.SetupSql) $true|Out-Null}
+  if($scenario.SetupSqlPath){
+    $setupPath=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot $scenario.SetupSqlPath) -ErrorAction Stop).Path
+    $sqlRoot=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'sql')).Path
+    if(-not $setupPath.StartsWith($sqlRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'scenario fixture path escapes reviewed SQL root'}
+    Invoke-I3aSql (Get-GuardedSql (Get-Content -Raw -LiteralPath $setupPath)) $true|Out-Null
+  }elseif($scenario.SetupSql){Invoke-I3aSql (Get-GuardedSql $scenario.SetupSql) $true|Out-Null}
   $argsA=@($approved.PsqlPath,$approved.CredentialPath,$appA,(Get-GuardedSql "SET application_name='$appA'; $($scenario.A)"),$authorization.target.projectId,$authorization.target.systemIdentifier,$authorization.target.databaseOid,$authorization.authorizationId,$authorization.fixturesDigest)
   $argsB=@($approved.PsqlPath,$approved.CredentialPath,$appB,(Get-GuardedSql "SET application_name='$appB'; $($scenario.B)"),$authorization.target.projectId,$authorization.target.systemIdentifier,$authorization.target.databaseOid,$authorization.authorizationId,$authorization.fixturesDigest)
   $jobA=Start-Job -ScriptBlock $sessionBlock -ArgumentList $argsA; $jobB=Start-Job -ScriptBlock $sessionBlock -ArgumentList $argsB
@@ -60,13 +66,15 @@ try {
   if($ready -cne '2|2|2'){throw 'committed readiness from two distinct bound backends was not proven'}
   $backendBinding=Invoke-I3aSql "SELECT count(*) FROM public.pf_i3a_concurrency_evidence e JOIN pg_stat_activity a ON a.pid=e.backend_pid AND a.application_name=e.application_name WHERE e.run_id='I3A-20261026-001' AND e.case_id='$CaseId' AND e.barrier_nonce='$barrierNonce' AND e.application_name IN ('$appA','$appB');"
   if($backendBinding -cne '2'){throw 'backend/application binding is unproven'}
-  Invoke-I3aSql "UPDATE public.pf_i3a_concurrency_evidence SET released=true WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND session_name='A' AND barrier_nonce='$barrierNonce' RETURNING 'A_RELEASED';" | Out-Null
-  $expectedLock=Invoke-I3aSql "SELECT (($($scenario.LockKeySql))>>32)::int::oid||'|'||(($($scenario.LockKeySql))::int)::oid;"
+  $releaseA=Invoke-I3aSql "WITH changed AS (UPDATE public.pf_i3a_concurrency_evidence SET released=true WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND session_name='A' AND barrier_nonce='$barrierNonce' RETURNING 1) SELECT 'A_RELEASED|'||count(*) FROM changed;"
+  Assert-I3aMutationAcknowledgement $releaseA 'A_RELEASED' 1|Out-Null
+  $expectedLock=Invoke-I3aSql "SELECT $($scenario.LockComponentsSql);"
   if($expectedLock -cnotmatch '^(\d+)\|(\d+)$'){throw 'application lock identity could not be derived'};$lockClass=$Matches[1];$lockObject=$Matches[2]
   $grantDeadline=[DateTimeOffset]::UtcNow.AddSeconds(8);$granted=''
   do{$granted=Invoke-I3aSql "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid WHERE a.application_name='$appA' AND l.locktype='advisory' AND l.granted AND l.classid=${lockClass}::oid AND l.objid=${lockObject}::oid AND l.objsubid=1;";if($granted -ceq '1'){break};Start-Sleep -Milliseconds 50}while([DateTimeOffset]::UtcNow -lt $grantDeadline)
   if($granted -cne '1'){throw 'blocker did not acquire the actual application advisory lock'}
-  Invoke-I3aSql "UPDATE public.pf_i3a_concurrency_evidence SET released=true WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND session_name='B' AND barrier_nonce='$barrierNonce' RETURNING 'B_RELEASED';" | Out-Null
+  $releaseB=Invoke-I3aSql "WITH changed AS (UPDATE public.pf_i3a_concurrency_evidence SET released=true WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND session_name='B' AND barrier_nonce='$barrierNonce' RETURNING 1) SELECT 'B_RELEASED|'||count(*) FROM changed;"
+  Assert-I3aMutationAcknowledgement $releaseB 'B_RELEASED' 1|Out-Null
   $lockDeadline=[DateTimeOffset]::UtcNow.AddSeconds(8);$lockProof='';$lockPattern="^\d+\|\d+\|$lockClass\|$lockObject$"
   do{
    $lockProof=Invoke-I3aSql "SELECT b.pid||'|'||w.pid||'|'||wl.classid||'|'||wl.objid FROM pg_stat_activity w CROSS JOIN LATERAL unnest(pg_blocking_pids(w.pid)) bp(pid) JOIN pg_stat_activity b ON b.pid=bp.pid JOIN pg_locks wl ON wl.pid=w.pid AND NOT wl.granted AND wl.locktype='advisory' JOIN pg_locks bl ON bl.pid=b.pid AND bl.granted AND bl.locktype='advisory' AND bl.classid=wl.classid AND bl.objid=wl.objid AND bl.objsubid=wl.objsubid WHERE w.application_name='$appB' AND b.application_name='$appA' AND wl.classid=${lockClass}::oid AND wl.objid=${lockObject}::oid AND wl.objsubid=1;"
@@ -74,19 +82,21 @@ try {
   }while([DateTimeOffset]::UtcNow -lt $lockDeadline)
   if($lockProof -notmatch "^(\d+)\|(\d+)\|$lockClass\|$lockObject$"){throw 'exact application advisory lock blocker/waiter relationship was not observed'}
   $blocker=[int]$Matches[1];$waiter=[int]$Matches[2]
-  Invoke-I3aSql "UPDATE public.pf_i3a_concurrency_evidence SET coordinator_observed_at=clock_timestamp(),observed_blocker_pid=$blocker,observed_waiter_pid=$waiter WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND barrier_nonce='$barrierNonce';" | Out-Null
+  $observed=Invoke-I3aSql "WITH changed AS (UPDATE public.pf_i3a_concurrency_evidence SET coordinator_observed_at=clock_timestamp(),observed_blocker_pid=$blocker,observed_waiter_pid=$waiter WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND barrier_nonce='$barrierNonce' RETURNING 1) SELECT 'COORDINATOR_OBSERVED|'||count(*) FROM changed;"
+  Assert-I3aMutationAcknowledgement $observed 'COORDINATOR_OBSERVED' 2|Out-Null
   $done=@(Wait-Job $jobA,$jobB -Timeout 30);if($done.Count -ne 2){throw 'bounded concurrency completion timeout'}
-  $results=@($jobA,$jobB|Receive-Job);$outcomes=@();foreach($result in $results){$parsed=ConvertFrom-I3aProcessOutput $result.ExitCode $result.Stdout $result.Stderr 'concurrency-session';$payload=$parsed.Envelope.payload;if($payload.case -cne $CaseId){throw 'case-bound result mismatch'};$outcomes+=[string]$payload.outcome;if([int]$payload.effect_count -ne [int]$scenario.ExpectedEffectCount){throw 'backend authoritative count mismatch'}}
+  $results=@($jobA,$jobB|Receive-Job);$outcomes=@();$observedCounts=@{};foreach($result in $results){$parsed=ConvertFrom-I3aProcessOutput $result.ExitCode $result.Stdout $result.Stderr 'concurrency-session';$payload=$parsed.Envelope.payload;if($payload.case -cne $CaseId){throw 'case-bound result mismatch'};$outcome=[string]$payload.outcome;$outcomes+=$outcome;if(-not $scenario.ExpectedOutcomeEffectCounts.ContainsKey($outcome)){throw 'unexpected outcome has no authoritative count contract'};$observedCount=[int]$payload.effect_count;if($observedCount -ne [int]$scenario.ExpectedOutcomeEffectCounts[$outcome]){throw 'backend authoritative count mismatch'};$observedCounts[$outcome]=$observedCount}
   if((@($outcomes|Sort-Object)-join '|') -cne (@($scenario.ExpectedOutcomes|Sort-Object)-join '|')){throw 'exact outcome set mismatch'}
-  if([int](Invoke-I3aSql $scenario.FinalCountSql) -ne [int]$scenario.ExpectedEffectCount){throw 'final authoritative effect count mismatch'}
+  $finalEffectCount=[int](Invoke-I3aSql $scenario.FinalCountSql);if($finalEffectCount -ne [int]$scenario.ExpectedFinalEffectCount){throw 'final authoritative effect count mismatch'}
+  $finalInvariant=(Invoke-I3aSql $scenario.FinalInvariantSql);if($finalInvariant -cne 't'){throw 'final authoritative state invariant mismatch'}
   $overlap=Invoke-I3aSql "SELECT count(*)||'|'||count(DISTINCT backend_pid)||'|'||(max(entered_critical_at)<min(left_critical_at))||'|'||bool_and(coordinator_observed_at IS NOT NULL)||'|'||min(observed_blocker_pid)||'|'||min(observed_waiter_pid) FROM public.pf_i3a_concurrency_evidence WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND barrier_nonce='$barrierNonce';"
   if($overlap -cnotmatch "^2\|2\|t\|t\|$blocker\|$waiter$"){throw 'overlap/backend/coordinator proof mismatch'}
-  Write-I3aEvidence $authorization.evidenceRoot $authorization.runId 'postgres-concurrency' 'EXECUTED_UNREVIEWED' @{case=$CaseId;barrier=$barrierNonce;lock="application-advisory:${lockClass}:${lockObject}";blocker=$blocker;waiter=$waiter;outcomes=$outcomes;effectCount=$scenario.ExpectedEffectCount;cancellation='NOT_REQUIRED'}
+  Write-I3aEvidence $authorization.evidenceRoot $authorization.runId 'postgres-concurrency' 'EXECUTED_UNREVIEWED' @{case=$CaseId;barrier=$barrierNonce;lock="application-advisory:${lockClass}:${lockObject}";blocker=$blocker;waiter=$waiter;outcomes=$outcomes;outcomeEffectCounts=$observedCounts;effectCount=$finalEffectCount;finalStateInvariant=$finalInvariant;cancellation='NOT_REQUIRED'}
 } catch {
   $safe=ConvertTo-I3aSanitizedText $_.Exception.Message
   try{
    $pids=Invoke-I3aSql "SELECT COALESCE(string_agg(backend_pid::text,','),'') FROM public.pf_i3a_concurrency_evidence WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND barrier_nonce='$barrierNonce';"
-   if($pids -match '^\d+(,\d+)?$'){Invoke-I3aSql "SELECT bool_and(pg_cancel_backend(pid)) FROM pg_stat_activity WHERE pid=ANY(string_to_array('$pids',',')::int[]) AND application_name IN ('$appA','$appB');"|Out-Null;$deadline=[DateTimeOffset]::UtcNow.AddSeconds(5);do{$remaining=Invoke-I3aSql "SELECT count(*) FROM pg_stat_activity WHERE pid=ANY(string_to_array('$pids',',')::int[]) AND application_name IN ('$appA','$appB');";if($remaining -ceq '0'){break};Start-Sleep -Milliseconds 50}while([DateTimeOffset]::UtcNow -lt $deadline);$noLock=Invoke-I3aSql "SELECT count(*) FROM pg_locks WHERE pid=ANY(string_to_array('$pids',',')::int[]) AND locktype='advisory';";$rolled=Invoke-I3aSql $scenario.RollbackProofSql;if($remaining -ceq '0' -and $noLock -ceq '0' -and $rolled -ceq 't'){$cancelDisposition='VERIFIED_ROLLBACK';Invoke-I3aSql "UPDATE public.pf_i3a_concurrency_evidence SET cancelled=true,rollback_verified=true WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND barrier_nonce='$barrierNonce' RETURNING 'ROLLBACK_VERIFIED';"|Out-Null}else{$cancelDisposition='UNVERIFIED_PARTIAL_EVIDENCE'}}
+   if($pids -match '^\d+(,\d+)?$'){Invoke-I3aSql "SELECT bool_and(pg_cancel_backend(pid)) FROM pg_stat_activity WHERE pid=ANY(string_to_array('$pids',',')::int[]) AND application_name IN ('$appA','$appB');"|Out-Null;$deadline=[DateTimeOffset]::UtcNow.AddSeconds(5);do{$remaining=Invoke-I3aSql "SELECT count(*) FROM pg_stat_activity WHERE pid=ANY(string_to_array('$pids',',')::int[]) AND application_name IN ('$appA','$appB');";if($remaining -ceq '0'){break};Start-Sleep -Milliseconds 50}while([DateTimeOffset]::UtcNow -lt $deadline);$noLock=Invoke-I3aSql "SELECT count(*) FROM pg_locks WHERE pid=ANY(string_to_array('$pids',',')::int[]) AND locktype='advisory';";$rolled=Invoke-I3aSql $scenario.RollbackProofSql;if($remaining -ceq '0' -and $noLock -ceq '0' -and $rolled -ceq 't'){$cancelDisposition='VERIFIED_ROLLBACK';$rollbackAck=Invoke-I3aSql "WITH changed AS (UPDATE public.pf_i3a_concurrency_evidence SET cancelled=true,rollback_verified=true WHERE run_id='I3A-20261026-001' AND case_id='$CaseId' AND barrier_nonce='$barrierNonce' RETURNING 1) SELECT 'ROLLBACK_VERIFIED|'||count(*) FROM changed;";Assert-I3aMutationAcknowledgement $rollbackAck 'ROLLBACK_VERIFIED' 2|Out-Null}else{$cancelDisposition='UNVERIFIED_PARTIAL_EVIDENCE'}}
   }catch{$cancelDisposition='UNVERIFIED_CANCELLATION'}
   Write-I3aEvidence $authorization.evidenceRoot $authorization.runId 'postgres-concurrency' 'ABORTED_NOT_PASS' @{case=$CaseId;error=$safe;cancellation=$cancelDisposition}
   throw "$safe; cancellation=$cancelDisposition"

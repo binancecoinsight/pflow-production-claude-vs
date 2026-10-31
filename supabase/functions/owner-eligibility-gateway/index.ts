@@ -2,7 +2,8 @@
 import {
   AmbiguousOutcomeError, I3_CONTRACT_VERSION, assertDigest, assertText, assertUuid,
   commandIdentity, immutableCopy, sha256Text, type Applied, type CommandContext,
-  type GatewayAuthority, type OperationIdentity, type PresentedCredential,
+  type GatewayAuthority, type GatewayCapability, type OperationIdentity, type PresentedCredential,
+  type VerifiedPrincipal,
 } from '../_shared/owner-security-i3';
 
 export interface ReserveEligibilityCommand {
@@ -41,17 +42,28 @@ export interface OwnerIdentityProvider {
   recoverExact(providerOperationId: string): Promise<ProviderRecovery>;
 }
 export interface IssuanceAttempt {
-  state: 'PROVIDER_PENDING' | 'COMPLETED'; identity: OperationIdentity; providerOperationId: string;
+  state: 'PROVIDER_PENDING' | 'COMPLETED'; originalIdentity: OperationIdentity;
+  originalCredentialVersion: number; providerOperationId: string;
+  authoritativeCommand: IssueIdentityCommand;
   result?: IdentityResult;
+}
+export interface IssuanceLookup {
+  operationId: string; applicantKey: string; pharmacyContextId: string;
+}
+export interface IssuanceExecution {
+  actor: VerifiedPrincipal; capability: Extract<GatewayCapability, 'IDENTITY_ISSUE' | 'IDENTITY_RECOVER'>;
 }
 /** Every repository mutation is a single authoritative transaction in a future adapter. */
 export interface OwnerGatewayRepository {
   reserveAtomic(identity: OperationIdentity, command: ReserveEligibilityCommand): Promise<Applied<ReservationResult>>;
-  beginIssuanceAtomic(identity: OperationIdentity, command: IssueIdentityCommand): Promise<Applied<IssuanceAttempt>>;
-  completeIssuanceAtomic(identity: OperationIdentity, command: IssueIdentityCommand, provider: ProviderIdentity): Promise<Applied<IdentityResult>>;
-  completeIssuanceRecoveryAtomic(identity: OperationIdentity, command: IssueIdentityCommand, provider: ProviderIdentity): Promise<Applied<IdentityResult>>;
+  beginIssuanceAtomic(identity: OperationIdentity, originalCredentialVersion: number, command: IssueIdentityCommand): Promise<Applied<IssuanceAttempt>>;
+  authorizeProviderDispatchAtomic(execution: IssuanceExecution, lookup: IssuanceLookup): Promise<IssuanceAttempt>;
+  authorizeProviderResolutionAtomic(execution: IssuanceExecution, lookup: IssuanceLookup): Promise<IssuanceAttempt>;
+  completeIssuanceAtomic(execution: IssuanceExecution, lookup: IssuanceLookup, provider: ProviderIdentity): Promise<Applied<IdentityResult>>;
+  completeIssuanceRecoveryAtomic(execution: IssuanceExecution, lookup: IssuanceLookup, provider: ProviderIdentity): Promise<Applied<IdentityResult>>;
+  recoverCompletedIssuanceAtomic(execution: IssuanceExecution, lookup: IssuanceLookup): Promise<IdentityResult | null>;
   recoverExact<T>(identity: OperationIdentity): Promise<T | null>;
-  recoverIssuanceAttempt(identity: OperationIdentity): Promise<IssuanceAttempt | null>;
+  recoverIssuanceAttempt(execution: IssuanceExecution, lookup: IssuanceLookup): Promise<IssuanceAttempt | null>;
 }
 export interface OwnerGatewayDependencies { authority: GatewayAuthority; repository: OwnerGatewayRepository; provider: OwnerIdentityProvider; }
 
@@ -103,6 +115,24 @@ const assertProviderBinding = (p: ProviderIdentity, c: IssueIdentityCommand): vo
   if (p.emailConfirmed) throw new Error('AUTHENTICATED_CONTINUATION_REQUIRED');
 };
 
+const scopeFor = (context: CommandContext) => ({
+  applicantKey: context.applicantKey,
+  pharmacyContextId: context.pharmacyContextId,
+});
+const lookupFor = (context: CommandContext): IssuanceLookup => ({
+  operationId: context.operationId,
+  ...scopeFor(context),
+});
+const requireExecution = async (
+  credential: PresentedCredential,
+  capability: IssuanceExecution['capability'],
+  context: CommandContext,
+  d: OwnerGatewayDependencies,
+): Promise<IssuanceExecution> => ({
+  actor: await d.authority.requireGatewayForContext(credential, capability, scopeFor(context)),
+  capability,
+});
+
 export async function reserveOwnerEligibility(credential: PresentedCredential, command: ReserveEligibilityCommand, d: OwnerGatewayDependencies): Promise<Applied<ReservationResult>> {
   validateReserve(command); await assertEmailBinding(command.normalizedEmail, command.context.applicantKey);
   const principal = await d.authority.requireGateway(credential, 'ELIGIBILITY_RESERVE');
@@ -117,23 +147,31 @@ export async function recoverReservedEligibility(credential: PresentedCredential
   if (!result) throw new Error('AUTHORITATIVE_RESULT_NOT_FOUND'); return immutableCopy(result);
 }
 
-const complete = async (identity: OperationIdentity, command: IssueIdentityCommand, provider: ProviderIdentity, d: OwnerGatewayDependencies): Promise<Applied<IdentityResult>> => {
+const complete = async (credential: PresentedCredential, attempt: IssuanceAttempt, provider: ProviderIdentity, d: OwnerGatewayDependencies): Promise<Applied<IdentityResult>> => {
+  const command = attempt.authoritativeCommand;
   assertProviderBinding(provider, command);
-  try { return immutableCopy(await d.repository.completeIssuanceAtomic(identity, immutableCopy(command), immutableCopy(provider))); }
+  const lookup = lookupFor(command.context);
+  const execution = await requireExecution(credential, 'IDENTITY_ISSUE', command.context, d);
+  try { return immutableCopy(await d.repository.completeIssuanceAtomic(execution, lookup, immutableCopy(provider))); }
   catch (error) {
     if (!(error instanceof AmbiguousOutcomeError)) throw error;
-    const result = await d.repository.recoverExact<IdentityResult>(identity);
+    const lookupExecution = await requireExecution(credential, 'IDENTITY_ISSUE', command.context, d);
+    const result = await d.repository.recoverCompletedIssuanceAtomic(lookupExecution, lookup);
     if (!result) throw new Error('DATABASE_EXACT_RECOVERY_REQUIRED');
     return { outcome: 'REPLAY', result: immutableCopy(result) };
   }
 };
 
-const completeRecovery = async (identity: OperationIdentity, command: IssueIdentityCommand, provider: ProviderIdentity, d: OwnerGatewayDependencies): Promise<Applied<IdentityResult>> => {
+const completeRecovery = async (credential: PresentedCredential, attempt: IssuanceAttempt, provider: ProviderIdentity, d: OwnerGatewayDependencies): Promise<Applied<IdentityResult>> => {
+  const command = attempt.authoritativeCommand;
   assertProviderBinding(provider, command);
-  try { return immutableCopy(await d.repository.completeIssuanceRecoveryAtomic(identity, immutableCopy(command), immutableCopy(provider))); }
+  const lookup = lookupFor(command.context);
+  const execution = await requireExecution(credential, 'IDENTITY_RECOVER', command.context, d);
+  try { return immutableCopy(await d.repository.completeIssuanceRecoveryAtomic(execution, lookup, immutableCopy(provider))); }
   catch (error) {
     if (!(error instanceof AmbiguousOutcomeError)) throw error;
-    const result = await d.repository.recoverExact<IdentityResult>(identity);
+    const lookupExecution = await requireExecution(credential, 'IDENTITY_RECOVER', command.context, d);
+    const result = await d.repository.recoverCompletedIssuanceAtomic(lookupExecution, lookup);
     if (!result) throw new Error('DATABASE_EXACT_RECOVERY_REQUIRED');
     return { outcome: 'REPLAY', result: immutableCopy(result) };
   }
@@ -141,43 +179,61 @@ const completeRecovery = async (identity: OperationIdentity, command: IssueIdent
 
 export async function issueOwnerIdentity(credential: PresentedCredential, command: IssueIdentityCommand, d: OwnerGatewayDependencies): Promise<Applied<IdentityResult>> {
   validateIssue(command); await assertEmailBinding(command.normalizedEmail, command.context.applicantKey);
-  const principal = await d.authority.requireGateway(credential, 'IDENTITY_ISSUE');
+  const principal = await d.authority.requireGatewayForContext(credential, 'IDENTITY_ISSUE', scopeFor(command.context));
   const identity = await commandIdentity(principal, 'IDENTITY_ISSUE', command.context, issueFields(command));
   // This transaction validates the authoritative reservation and durably records PROVIDER_PENDING before any provider call.
-  const begun = await d.repository.beginIssuanceAtomic(identity, immutableCopy(command));
+  const begun = await d.repository.beginIssuanceAtomic(identity, principal.credentialVersion, immutableCopy(command));
   if (begun.result.state === 'COMPLETED' && begun.result.result) return { outcome: 'REPLAY', result: immutableCopy(begun.result.result) };
 
+  // A new attempt may dispatch under issue authority. A restarted or ambiguous attempt may only resolve
+  // under recovery authority. In both cases the repository reloads the immutable original command.
+  let recoveryPhase = begun.outcome === 'REPLAY';
+  let attempt: IssuanceAttempt;
+  if (recoveryPhase) {
+    const resolutionExecution = await requireExecution(credential, 'IDENTITY_RECOVER', command.context, d);
+    attempt = await d.repository.authorizeProviderResolutionAtomic(resolutionExecution, lookupFor(command.context));
+  } else {
+    const dispatchExecution = await requireExecution(credential, 'IDENTITY_ISSUE', command.context, d);
+    attempt = await d.repository.authorizeProviderDispatchAtomic(dispatchExecution, lookupFor(command.context));
+  }
+  let authoritativeCommand = attempt.authoritativeCommand;
   let provider: ProviderIdentity | null = null;
-  if (begun.outcome === 'REPLAY') {
-    const recovery = await d.provider.recoverExact(command.providerOperationId);
+  if (recoveryPhase) {
+    const recovery = await d.provider.recoverExact(authoritativeCommand.providerOperationId);
     if (recovery.outcome !== 'FOUND') throw new Error('ISSUANCE_RECOVERY_PENDING');
     provider = recovery.identity;
   } else {
-    const existing = await d.provider.inspectExistingByEmail(normalizedEmail(command.normalizedEmail));
+    const existing = await d.provider.inspectExistingByEmail(normalizedEmail(authoritativeCommand.normalizedEmail));
     if (existing) provider = existing;
     else {
       try {
-        provider = await d.provider.createUnconfirmedOwner({ providerOperationId: command.providerOperationId, normalizedEmail: normalizedEmail(command.normalizedEmail), fullName: command.fullName.trim(), trustedOwnerMarker: markerFor(command) });
+        provider = await d.provider.createUnconfirmedOwner({ providerOperationId: authoritativeCommand.providerOperationId, normalizedEmail: normalizedEmail(authoritativeCommand.normalizedEmail), fullName: authoritativeCommand.fullName.trim(), trustedOwnerMarker: markerFor(authoritativeCommand) });
       } catch (error) {
         if (!(error instanceof AmbiguousOutcomeError)) throw error;
-        const recovery = await d.provider.recoverExact(command.providerOperationId);
+        const recoveryExecution = await requireExecution(credential, 'IDENTITY_RECOVER', authoritativeCommand.context, d);
+        const recoveryAttempt = await d.repository.authorizeProviderResolutionAtomic(recoveryExecution, lookupFor(authoritativeCommand.context));
+        recoveryPhase = true;
+        attempt = recoveryAttempt;
+        authoritativeCommand = recoveryAttempt.authoritativeCommand;
+        const recovery = await d.provider.recoverExact(recoveryAttempt.providerOperationId);
         if (recovery.outcome !== 'FOUND') throw new Error('ISSUANCE_RECOVERY_PENDING');
         provider = recovery.identity;
       }
     }
   }
-  return complete(identity, command, provider, d);
+  return recoveryPhase ? completeRecovery(credential, attempt, provider, d) : complete(credential, attempt, provider, d);
 }
 
 export async function recoverIssuedIdentity(credential: PresentedCredential, command: IssueIdentityCommand, d: OwnerGatewayDependencies): Promise<IdentityResult> {
   validateIssue(command); await assertEmailBinding(command.normalizedEmail, command.context.applicantKey);
-  const principal = await d.authority.requireGateway(credential, 'IDENTITY_RECOVER');
-  const identity = await commandIdentity(principal, 'IDENTITY_ISSUE', command.context, issueFields(command));
-  const result = await d.repository.recoverExact<IdentityResult>(identity);
-  if (result) return immutableCopy(result);
-  const attempt = await d.repository.recoverIssuanceAttempt(identity);
+  const lookup = lookupFor(command.context);
+  const lookupExecution = await requireExecution(credential, 'IDENTITY_RECOVER', command.context, d);
+  const attempt = await d.repository.recoverIssuanceAttempt(lookupExecution, lookup);
   if (!attempt) throw new Error('AUTHORITATIVE_RESULT_NOT_FOUND');
-  const recovery = await d.provider.recoverExact(command.providerOperationId);
+  if (attempt.state === 'COMPLETED' && attempt.result) return immutableCopy(attempt.result);
+  const resolutionExecution = await requireExecution(credential, 'IDENTITY_RECOVER', attempt.authoritativeCommand.context, d);
+  const resolutionAttempt = await d.repository.authorizeProviderResolutionAtomic(resolutionExecution, lookupFor(attempt.authoritativeCommand.context));
+  const recovery = await d.provider.recoverExact(resolutionAttempt.providerOperationId);
   if (recovery.outcome !== 'FOUND') throw new Error('ISSUANCE_RECOVERY_PENDING');
-  return (await completeRecovery(identity, command, recovery.identity, d)).result;
+  return (await completeRecovery(credential, resolutionAttempt, recovery.identity, d)).result;
 }

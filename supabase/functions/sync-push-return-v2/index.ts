@@ -65,7 +65,19 @@ export async function handleSyncPushReturnV2(request: Request): Promise<Response
     const valid = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, await importKey(device.public_key_pem), decodeBase64(signature), new TextEncoder().encode(signingMessage(body, payloadHash)));
     if (!valid) return error(401, 'SIGNATURE_INVALID');
   } catch { return error(401, 'SIGNATURE_INVALID'); }
-  const { data, error: rpcError } = await admin.rpc('rpc_process_sale_return_v2', {
+  const operationClient = createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: {
+      'X-PharmacyFlow-Actor-Id': userData.user.id,
+      'X-PharmacyFlow-Pharmacy-Id': String(body.pharmacy_id),
+      'X-PharmacyFlow-Branch-Id': String(body.branch_id),
+      'X-PharmacyFlow-Device-Id': String(body.device_id),
+      'X-PharmacyFlow-Operation-Kind': 'SALE_REFUND',
+      'X-PharmacyFlow-Client-Operation-Id': String(body.client_op_id),
+      'X-PharmacyFlow-Payload-Fingerprint': payloadHash
+    } }
+  });
+  const { data, error: rpcError } = await operationClient.rpc('rpc_process_sale_return_v2', {
     p_actor_user_id: userData.user.id, p_pharmacy_id: body.pharmacy_id, p_branch_id: body.branch_id,
     p_device_id: body.device_id, p_client_op_id: body.client_op_id, p_nonce: body.nonce,
     p_payload_hash: payloadHash, p_sale_id: body.sale_id, p_items: body.items,

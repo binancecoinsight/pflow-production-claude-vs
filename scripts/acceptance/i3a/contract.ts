@@ -20,6 +20,10 @@ export const FIXTURES = Object.freeze({
   applicantA: 'c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf',
   applicantB: '0f46f0ba6b7213ccafdfd4a8245a5b323735e7970e69f67cdbf0a3ab00633d29',
   applicantEmailA: 'owner.i3a.001@example.invalid', applicantEmailB: 'owner.i3a.002@example.invalid',
+  reservationFirstApplicant: 'eb9ee3407ab728705bee110c0abb73bac0e66280aa04d14798e6c9f692cfde32',
+  reservationFirstEmail: 'owner.i3a.reservation-first@example.invalid',
+  revocationFirstApplicant: '89ea448ef3060fc9493bb02c83753ee67028ffbcc393c3217ecbce1cbe289bf1',
+  revocationFirstEmail: 'owner.i3a.revocation-first@example.invalid',
   contextA: '10000000-0000-4000-8000-000000000001', contextB: '10000000-0000-4000-8000-000000000002',
   operationPrefix: '20000000-0000-4000-8000-', requestPrefix: '30000000-0000-4000-8000-',
   decisionPrefix: '40000000-0000-4000-8000-', providerPrefix: '50000000-0000-4000-8000-',
@@ -33,16 +37,22 @@ export const MIGRATIONS = Object.freeze({
   'supabase/migrations/20261026000030_owner_gateway_operator_contract_v1.sql': 'e6b5ee258573eab85e8913601fd64eeff97c3a1f59d497369cdc847cab8cae54',
   'supabase/migrations/20261026000031_owner_gateway_operator_correction_v1.sql': '9e2a85990b85ec73746f3114d3b798a61135b42072c22558a4fa51c9ce4cba6e',
   'supabase/migrations/20261026000032_owner_gateway_boundary_parity_v1.sql': '448384e6981c66ac0090716eb1322e45f90a2464440cbe7170380c91cdbb66da',
+  'supabase/migrations/20261026000033_owner_identity_recovery_linearization_v1.sql': '1065386b66fcc3b03b4a9e3026869b6aee4ebeeea6c572ead9d7e3ac0ec8477f',
+  'supabase/migrations/20261026000034_owner_identity_issue_principal_binding_v1.sql': '3ed6fa4aa1a0fc85d52df0bbdd644095c40f301e357630ff9d304b5fec07582b',
 });
 
 export const REQUIRED_SOURCE_PATHS = Object.freeze([
   'supabase/functions/_shared/owner-security-i3.ts',
+  'scripts/acceptance/i3a/identity-response.ts',
   'scripts/acceptance/i3a/contract.ts', 'scripts/acceptance/i3a/preflight.ts',
   'scripts/acceptance/i3a/orchestrator.ts', 'scripts/acceptance/i3a/evidence.ts',
   'scripts/acceptance/i3a/process-output.ts', 'scripts/acceptance/i3a/concurrency-evidence.ts',
+  'scripts/acceptance/i3a/runner-contract.ts',
   'scripts/acceptance/i3a/preflight.ps1', 'scripts/acceptance/i3a/evidence.ps1',
   'scripts/acceptance/i3a/process-output.ps1', 'scripts/acceptance/i3a/executor.ps1',
   'scripts/acceptance/i3a/process-output.test.ps1',
+  'scripts/acceptance/i3a/runner-contract.ps1', 'scripts/acceptance/i3a/runner-contract.test.ps1',
+  'scripts/acceptance/i3a/reservation-revocation.test.ps1',
   'scripts/acceptance/i3a/concurrency-runner.ps1', 'scripts/acceptance/i3a/scenarios.ps1',
   'scripts/acceptance/i3a/sql/00_guard.sql', 'scripts/acceptance/i3a/sql/01_target_proof.sql',
   'scripts/acceptance/i3a/sql/10_fixture.sql', 'scripts/acceptance/i3a/sql/20_acl_rls_assertions.sql',
@@ -50,7 +60,10 @@ export const REQUIRED_SOURCE_PATHS = Object.freeze([
   'scripts/acceptance/i3a/sql/23_operation_recovery_assertions.sql',
   'scripts/acceptance/i3a/sql/24_atomic_replay_assertions.sql',
   'scripts/acceptance/i3a/sql/25_lifecycle_recovery_assertions.sql',
-  'scripts/acceptance/i3a/sql/40_concurrency_scenarios.sql', 'scripts/acceptance/i3a/sql/90_cleanup.sql',
+  'scripts/acceptance/i3a/sql/26_identity_phase_assertions.sql',
+  'scripts/acceptance/i3a/sql/40_concurrency_scenarios.sql',
+  'scripts/acceptance/i3a/sql/41_reservation_first_fixture.sql',
+  'scripts/acceptance/i3a/sql/42_revocation_first_fixture.sql', 'scripts/acceptance/i3a/sql/90_cleanup.sql',
 ] as const);
 export const REQUIRED_HASH_PATHS = Object.freeze([...REQUIRED_SOURCE_PATHS, ...Object.keys(MIGRATIONS)]);
 
@@ -58,7 +71,8 @@ export const COMMANDS = Object.freeze(['postgres-fixture', 'postgres-assertions'
 export type CommandName = (typeof COMMANDS)[number];
 export const CONCURRENCY_CASES = Object.freeze([
   'OPERATION_COLLISION_PENDING_FIRST', 'OPERATION_COLLISION_COMPLETED_FIRST',
-  'DURABLE_PENDING_RECOVERY', 'RESERVATION_REVOCATION', 'CONSUMPTION_REVOCATION',
+  'RESERVATION_REVOCATION_RESERVATION_FIRST', 'RESERVATION_REVOCATION_REVOCATION_FIRST',
+  'DURABLE_PENDING_RECOVERY', 'CONSUMPTION_REVOCATION',
 ] as const);
 export type ConcurrencyCase = (typeof CONCURRENCY_CASES)[number];
 

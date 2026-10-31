@@ -1,5 +1,104 @@
 # PharmacyFlow Decision Ledger
 
+## DEC-045 - PF-MVP-10 native-client diagnostic boundary
+
+1. A native diagnostic prefix authorizes no content. It is normalized only when its source resolves to the exact approved `-f` SQL path and its line is positive and within that file.
+2. Normalization removes the file/line prefix before notice or worker-event validation. Raw paths and diagnostic payloads are never retained.
+3. Benign migration notices use exact PostgreSQL forms, including `column … of relation …` and `constraint … of relation …`; unknown `NOTICE` and all context diagnostics remain fail-closed.
+4. Native transcript rehearsals are source/consumer conformance evidence only. PostgreSQL execution remains a separate protected acceptance gate.
+
+## DEC-044 - PF-MVP-10 emitter/consumer conformance
+
+1. Runtime proof has one frame contract: `PF_PASS|runtime|<server-version-number>|target-verified`.
+2. Every non-worker acceptance SQL module emits exactly one expected terminal frame. Protected migrations emit no protocol frames; narrowly enumerated PostgreSQL skip notices are validated and discarded.
+3. Worker evidence is exactly two validated events for the expected actor: READY then TERMINAL. Other `PF_PASS`, `PF_RESULT`, `PF_COUNT`, actor, duplicate, field or diagnostic evidence rejects the worker and is not retained.
+4. Concurrency testing replaces sync/worker processes only; it runs the production coordinator. Source-derived representative transcripts establish conformance, never PostgreSQL behavior.
+
+## DEC-043 - PF-MVP-10 whole-command acceptance closure
+
+1. `PF-MVP-10_EXECUTION_INVENTORY.sha256` is the sole executable inventory: 41 active migrations plus 20 exact runtime dependencies. Review manifests are historical evidence and are never recursively executed or revalidated as current source inventories.
+2. Managed command dispatch communicates only through structured results and exceptions. `$LASTEXITCODE` is not an input to command success.
+3. Raw stdout, stderr and notices are never retained. Only narrow validated `PF_*` frames and fixed non-secret diagnostic dispositions may enter evidence.
+4. Every documented command must pass the same authorization, inventory, dispatch and result path in the injected rehearsal. Protected process execution is the only replaced boundary.
+
+## DEC-042 - PF-MVP-10 production-path integration closure
+
+1. The runner has one default PowerShell-to-C# process bridge. Tests may replace its process adapter, but not the bridge or result validation.
+2. Worker evidence is a complete versioned transcript: READY with backend identity, coordinator BLOCKER, and TERMINAL. M-13 concurrent duplicate identity is `23505` conflict, not replay.
+3. Refund V2 exact replay retains operation/payload identity but consumes a fresh transport nonce. Nonce reuse, changed payload and expired committed replay are separate assertions.
+4. Append-only audit, ledger and entitlement evidence is not removable by fixture cleanup. Cleanup proves ownership/dependencies and refuses deletion; environment destruction is a separate owner decision.
+
+## DEC-041 - PF-MVP-10 runner safety closure
+
+1. Acceptance assertions are mutating fixture work and require explicit `fixtureWrite` authority in both preflight implementations.
+2. The owner marker is a database-comment identity proof, not an echoed client variable. Mutating commands also require empty-target or verified-000039 state.
+3. Persistent fixtures require authorization/marker ownership plus exact UUID and dependency validation; cleanup and destruction remain distinct gates.
+4. Only distinct backends with an observed production lock blocker and exact effects qualify as concurrency evidence.
+5. PowerShell Core 7 and executable bytes are pinned; process arguments remain discrete and raw output is bounded before sanitized retention.
+
+## DEC-040 - PF-MVP-10 acceptance harness boundaries
+
+1. An owner instruction to author the harness is not authority to execute it. Execution authorization must pin target, operator tooling, evidence, hashes, commands and scenarios.
+2. Supabase Auth schemas/roles/functions and `pgcrypto` are runtime prerequisites, not replaceable test conveniences.
+3. Missing approval, hash/identity drift, incompatible runtime, cancellation or overbroad permissions abort before the next executor call.
+4. Fixture cleanup is separately authorized and limited to fixed package-owned identities. Environment destruction is a distinct decision and has no generic implementation.
+5. Provider/Auth UI, browser/datastore, AUTH-02 and direct-table policy remain excluded rather than synthetically accepted.
+
+## DEC-038 - Operation-specific inventory response evidence - 2026-10-29
+
+1. A table-returning mutation RPC must yield exactly one row; null, zero or multiple rows are invalid success evidence.
+2. Timestamps require strict Gregorian RFC3339 with an explicit timezone and PostgreSQL-compatible fractional precision; ambiguous JavaScript date parsing is prohibited.
+3. Intake validates completed status, item count and cost arithmetic. Adjustment validates requested batch, signed delta and resulting arithmetic. Receive validates requested transfer and positive item count.
+4. Dispatch returns the current transfer status on replay. Therefore exact dispatch replay accepts `DISPATCHED` or lifecycle-advanced `RECEIVED`; it must not require the initial status after receipt.
+5. Relationships are validated only when sealed SQL guarantees them. Server-generated intake purchase and dispatch transfer IDs require valid UUIDs but are not compared with unrelated request IDs.
+6. Snapshot mapping preserves returned tenant identifiers into validation. Rejection precedes replacement and preserves complete cache evidence.
+7. Entitlement `000035` is a separate protected-authoring concern and is not integrated by inventory work.
+
+## DEC-037 - MVP-02 local inventory acceptance boundary - 2026-10-29
+
+1. Accept MVP-02 locally only for inspected production source, injected client executors, in-memory presentation helpers and isolated fake IndexedDB.
+2. Snapshot replacement requires unique identities, valid batch-to-product association and safe integer quantities/prices before any transaction starts.
+3. Mutation success requires explicit response evidence; missing, malformed, unsafe or mismatched fields return `UNEXPECTED_RESPONSE` without defaults or coercion.
+4. Mocked RPC success establishes client handling only, never authoritative stock effects. Failed refresh preserves prior valid cache; valid refresh atomically replaces it.
+5. Inventory integration must not rewrite durable checkout identity, draft, sale, transaction or queue evidence.
+6. RPC signatures/payloads, accounting, schemas and protected contracts remain unchanged. Database/RLS/ledger/concurrency and browser acceptance remain separate under deferred AUTH-02.
+
+## DEC-036 - Cached branch stock evidence and local attention bands - 2026-10-28
+
+1. InventoryView runs one branch-scoped cached-stock derivation and passes the exact result to the attention panel and ProductList. ProductList performs no independent raw batch aggregation.
+2. Evidence identity is the coherent user, membership version, pharmacy, branch and role workspace key. Loading, query transitions, errors and workspace changes suppress prior numeric evidence.
+3. A missing batch group is unknown; an explicitly loaded empty group is known zero. Duplicate identities, malformed collections/rows, cross-pharmacy/product associations and unsafe individual or aggregate integers fail closed.
+4. Valid negative projections remain deficits. The display bands are `<=0`, `1-10`, and `>10`; the middle band is only a local cached attention band, never `reorder_level`, available-to-sell stock or purchasing advice.
+5. No expiry/status filtering is introduced. Search, limits, stale metadata, incompatible counts and snapshot generations prevent branch-wide completeness claims.
+6. The snapshot/query/storage/server contracts remain unchanged. Browser, IndexedDB, RLS/database and authoritative-stock acceptance remain separate under deferred AUTH-02.
+
+## DEC-035 - Product-detail publication identity - 2026-10-28
+
+1. Product-detail async state is identified by request generation and the complete coherent workspace key, pharmacy and selected product. Matching A identity after A-to-B-to-A is insufficient without the newest generation.
+2. Loading start, successful batches, unavailable evidence and loading finalization each pass through the same synchronous current-binding publication boundary. No caller carries a prior freshness decision across an await.
+3. Replacement selection starts a new generation. Modal close and coherent user/membership-version/pharmacy/branch/role changes invalidate and clear the visible detail state; unmount permanently disposes the coordinator.
+4. Successful evidence requires every returned batch to match both the requested pharmacy and product. Malformed associations fail closed to unavailable for a current request; stale failures and successes publish nothing.
+5. The existing eligible-batch query, strict expiry policy, presentation, POS/FEFO, durable checkout and financial/synchronization contracts remain unchanged. Local synthetic evidence is not browser/datastore/database acceptance; AUTH-02 remains deferred.
+
+## DEC-034 - Shared inventory expiry and reference-date contract - 2026-10-28
+
+1. Batch expiry accepts exact, valid Gregorian `YYYY-MM-DD` only; no trimming, prefix/suffix acceptance or calendar normalization is permitted.
+2. Reference dates accept valid `Date`, finite in-range epoch milliseconds, exact date-only, or strict timezone-bearing ISO/RFC3339 timestamps. Ambiguous JavaScript string parsing is prohibited.
+3. Date-only values are UTC days; timestamps are reduced from their actual instant to the UTC calendar day. Epoch zero is valid and selection uses nullish rather than truthy fallback.
+4. Same-day remains expired and valid FEFO ordering is preserved.
+5. One malformed candidate invalidates the complete selection/finalization operation. It is never silently skipped in favor of another candidate.
+6. Invalid expiry blocks cart mutation and sale/queue persistence but preserves the original durable checkout reservation and identities. Inventory detail reports unavailable evidence rather than empty inventory or FEFO confidence.
+7. Existing historical records are not repaired or migrated. Protected/browser/database acceptance remains separate and AUTH-02 remains deferred.
+
+## DEC-033 - MVP-01C read-only invitation publication boundary - 2026-10-27
+
+1. The only runtime invocation authored is M-16 `rpc_list_staff_invitations(UUID)` with `p_pharmacy_id` derived from the current coherent workspace; no fallback query exists.
+2. Client eligibility requires one coherent active OWNER/MANAGER user, membership, pharmacy, role and branch binding. This is UX containment and never substitutes for server authorization.
+3. All ten returned fields are validated as a complete response before publication. Raw RPC rows and diagnostics never enter React state; published rows and the containing array are allowlisted and frozen.
+4. Server status remains authoritative. A PENDING record past `expires_at` may carry only a visibly labelled time-derived indicator.
+5. Request generation and complete workspace binding are checked at the synchronous publication callback. Refresh and lifecycle invalidation prevent late or cross-workspace publication.
+6. Staff mutation, roster, storage, migration and protected execution scope is unchanged. Independent source review is next; AUTH-02 remains deferred.
+
 ## DEC-026 — Review reconciliation and I3A authority design — 2026-10-26
 
 1. Treat PF-SUP-02/05/06 as owner-supplied transcript evidence with only the stated dispositions; the repository-native review export remains missing.
@@ -269,9 +368,76 @@ DEC-006 through DEC-009 retain the historical Phase A decision trail; their “r
 - Shared harness tables are never dropped by fixture cleanup; immutable or unresolved evidence blocks deletion. Cancellation without verified backend exit, lock release and scenario-specific rollback absence is not PASS.
 - REV-LIN-01 remains undecided. Simulated database claims are not JWT/Auth acceptance.
 
+## DEC-028 — Coordinator mutation and advisory-lock component contracts
+
+- Coordinator evidence mutations must return one aggregate acknowledgment and validate the exact affected-row cardinality. A silent UPDATE or unvalidated `RETURNING` set cannot advance concurrency proof state.
+- The signed 64-bit advisory key maps to `pg_locks.classid` and `objid` as unsigned high/low 32-bit components. Session and coordinator SQL must be generated by the same source helper; direct narrowing through signed `int` is prohibited.
+- Local arithmetic, source assertions and parser checks do not establish PostgreSQL `pg_locks` parity. That remains protected acceptance evidence.
+- AUTH-02 and REV-LIN-01 are unchanged.
+
 ## DEC-027 — Concurrency evidence must originate from production boundaries
 
 - Executable ACC-01 concurrency cases must invoke the actual application RPC and prove the blocker/waiter pair on the lock acquired by that RPC. A harness-created serializing lock or direct business-row mutation cannot establish application concurrency acceptance.
 - Pending-first and completed-first operation collisions meet the source-design requirement. Durable recovery has no observable recovery lock, reservation/revocation needs an additionally reviewed committed-fixture lifecycle, and consumption requires prohibited confirmed-Auth fixtures; those cases remain sequential, blocked or not implemented.
 - PostgreSQL stdout has one typed envelope, while command tags, notices, diagnostics and stderr remain separate. Structured evidence is recursively sanitized before serialization.
 - REV-LIN-01 is unchanged and undecided. This local decision creates no database, Auth, provider or execution authority.
+
+## DEC-029 — Reservation/admission-revocation concurrency contract
+
+- Existing source supplies one genuine shared lock: both `rpc_gateway_reserve_owner_eligibility_v2` and `rpc_platform_owner_admission_decide_v2(..., 'REVOKE', ...)` reach `pg_advisory_xact_lock(hashtextextended(email_digest, 1))` before inspecting or updating the admission.
+- A committed active-admission fixture must be created through the admission RPC. Direct inserts into admission, decision, operation or eligibility business tables are not valid setup evidence for these cases.
+- Reservation-first linearizes while admission is active, so the request remains `RESERVED` even though the later admission revocation succeeds. Revocation-first makes the admission inactive, so the later reservation must fail `PI010` without a security operation or request.
+- Outcome-specific authoritative counts and exact final-state predicates supplement blocker/waiter proof. Cleanup refuses immutable fixture/scenario evidence; disposable-environment destruction remains a separate scope.
+- This decision concerns applicant admission state, not authority-credential revocation. It does not decide REV-LIN-01. PostgreSQL behavior remains **NOT RUN** and AUTH-02 remains deferred.
+
+## DEC-030 — REV-LIN-01 transaction-entry linearization approved
+
+- Each independently invoked privileged phase revalidates trusted identity, active state, exact credential version and action permission at its authoritative entry. A phase accepted there may finish its bounded transaction despite later credential revocation; later phases and calls must reauthorize.
+- Pending operations and queue/request evidence are not continuing authority. Provider dispatch and exact provider resolution are separate authority boundaries. Already-dispatched effects retain immutable operation/fingerprint/provider correlation and are never blindly repeated.
+- Revoked credentials cannot recover or replay. A different currently authorized `IDENTITY_RECOVER` principal may resolve the original operation; original authorship remains immutable and the recovery actor/version must be audited separately. Recovery-only authority cannot create identities.
+- Source reconciliation found missing dispatch/resolution rechecks and recovery-actor/original-actor conflation. REV-LIN-01 is **OWNER APPROVED — IMPLEMENTATION CORRECTION REQUIRED — NOT DATABASE VERIFIED**. AUTH-02 remains deferred.
+
+## DEC-031 — REV-LIN-01 phase authority and immutable recovery provenance
+
+- Selected approach: every independently invoked identity begin, dispatch, exact resolution, completion and result-lookup phase revalidates current action-specific authority. New dispatch uses `IDENTITY_ISSUE`; restart/uncertainty resolution uses `IDENTITY_RECOVER`.
+- Identity rule: original principal, credential version, complete normalized command fingerprint and provider correlation come from the durable attempt. A different recovery actor is never substituted into original authorship and is recorded separately in append-only audit.
+- Access rule: identity phases require active applicant/context scope in addition to principal status, exact credential version and capability. The new registry is empty and unprovisioned by design.
+- Legacy rule: incomplete pre-000033 provenance fails as `LEGACY_ISSUANCE_PROVENANCE_INCOMPLETE`; no credential version is fabricated.
+- Atomicity rule: correlation, operation/result persistence, attempt completion and required audit share a transaction. Recovery never creates, and unknown/absence remains unresolved.
+- Evidence: focused injected/static/compiler checks only. Migration `000033` is unexecuted; PostgreSQL/Auth/provider/browser/concurrency acceptance remains open under deferred AUTH-02.
+
+## DEC-032 — ACC-01 follows the current v4 identity contract without fabricating Auth evidence
+
+- The executable identity ACL matrix uses only the public v4/phase/result signatures introduced by `000033`; all superseded identity routes are explicit denial expectations after `000034`.
+- Disposable acceptance scope grants are exact run-owned fixtures. They are not production authority provisioning, cannot be silently adopted and are removed before their referenced authorities only when no immutable/unresolved dependency exists.
+- Pending phase authorization, cross-principal ISSUE denial and scoped RECOVER lookup can be authored without Auth. Successful completion, completed replay and completion-audit rollback cross the trusted `auth.users` marker boundary and remain `BLOCKED_AUTH_02`; direct Auth-row insertion is not an acceptable substitute.
+- v4 recovery now exposes the operation advisory lock, but recovery concurrency remains `NOT IMPLEMENTED` until its provider-resolution outcomes and committed pending-fixture lifecycle are separately reviewed. No PostgreSQL behavior is inferred from local source checks.
+
+## DEC-033 — Entitlement foundation is evidence-bound and unwired
+
+- Authoritative evidence must match the requested pharmacy and a complete, internally consistent strict-timestamp lifecycle contract.
+- Expired-state replay requires exact committed evidence bound to operation kind, client identity, tenant, actor/device and payload fingerprint; a boolean or domain ID is insufficient.
+- Administrative decisions use effective instant, monotonic sequence and UUID ordering. Renewal alone does not override suspension or a negative mutation decision.
+- Migration `000036` remains private, additive and unexecuted. It is not enforcement until protected route wiring is separately authorized and accepted.
+
+## DEC-034 — Foundation acceptance uses v2 evaluation and full-scope proof consumption
+
+- Authorization is consumed only with the current pharmacy, operation kind, client operation identity, actor/device and payload fingerprint; partial and boolean replay claims are invalid.
+- Administrative instants compare at six-digit microsecond precision, then sequence and UUID, matching the authored PostgreSQL ordering.
+- `000035` remains byte-preserved at the documented foundation hash. Additive `000037` revokes superseded callable helpers, avoids definer-owner trust and defines v2 evaluation/private proof surfaces without business-route wiring.
+- Reinstatement removes an administrative denial but cannot manufacture a valid commercial period. Trusted committed evidence must eventually be written atomically by separately authorized business-route wiring.
+
+## DEC-035 — PF-MVP-09/R/S is quarantined; additive files cannot repair an earlier parse failure
+
+- The executable lineage stops before malformed `20261029000037_consolidated_entitlement_enforcement_v1.sql`; later files cannot repair a parser stop.
+- Competing migration bytes and historical manifests remain evidence and are not silently normalized. “PROPOSED OWNER AUTHORIZATION” is not treated as owner approval.
+- Any replacement must derive from M-18 and Refund V2 including M-21–M-25, plus sealed M-13–M-16 contracts. Delegated/role-string trust is not sufficient without actor/tenant/branch/device provenance and exact replay proof.
+- Owner must explicitly authorize replacement-in-place or moving/renaming the malformed artifact before further wiring source is authored.
+## DEC-039 - PF-SUP-2026-10-30-03 entitlement precedence and replay decisions
+
+- The latest effective administrative decision is ordered by full PostgreSQL timestamp precision, then monotonic sequence, then UUID. Future decisions do not participate.
+- `SUSPEND` and `DENY_MUTATIONS` block. `REINSTATE` and `ALLOW_MUTATIONS` remove the administrative overlay but never override invalid, missing, cancelled, expired or out-of-grace commercial evidence.
+- Historical suspension anchors are immutable. If no effective administrative decision exists, any historical suspension remains fail-closed; an explicit later positive decision supersedes that overlay without deleting history.
+- M-9 remains available to authenticated callers but has no expired replay path because its signature contains no payload fingerprint. No replay evidence is invented.
+- Wrapper evidence fingerprints must be byte-equivalent to each sealed operation's canonicalization. Equivalent reordered/defaulted M-13 intake requests remain equivalent; material changes conflict.
+- Direct-table enforcement is not decided by this milestone.

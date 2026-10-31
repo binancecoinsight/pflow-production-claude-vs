@@ -1,5 +1,89 @@
 # PharmacyFlow MVP-to-Release Roadmap
 
+## PF-MVP-10 native-client conformance and final execution gate - 2026-10-31
+
+PF-SUP-2026-10-31-03 closes the remaining native `psql` prefix and notice-form mismatches while preserving strict diagnostic rejection. The refreshed local package is ready for independent review and a later exact disposable-target execution decision. Representative transcript conformance is not PostgreSQL acceptance.
+
+## PF-MVP-10 emitter/consumer conformance closure - 2026-10-31
+
+PF-SUP-2026-10-31-02 aligns every acceptance SQL emitter with its consumer, centralizes runtime proof, rehearses the actual concurrency coordinator through controlled process adapters and closes the worker-evidence retention gap. The next step is independent source/synthetic review. PostgreSQL acceptance, direct-table enforcement, environment destruction and AUTH-02 remain separate protected gates.
+
+## PF-MVP-10 whole-command acceptance closure - 2026-10-31
+
+PF-SUP-2026-10-31-01 delivers a nonrecursive execution inventory and rehearses every documented command through the real local preflight/dispatch/evidence surface. Managed dispatch is independent of stale native exit state, and retained process evidence is restricted to validated `PF_*` frames and fixed dispositions. Independent review is next; disposable execution still requires exact owner-supplied target, tools, credentials, evidence and per-command authority.
+
+## PF-MVP-10 production-path integration closure - 2026-10-31
+
+PF-SUP-2026-10-30-06 closes the local runner integration findings: the production bridge is directly rehearsed with a process spy, worker transcripts are complete and versioned, M-13 and Refund V2 fixtures match sealed conflict/nonce behavior, and unsafe cleanup is an explicit immutable-evidence refusal. Independent source/synthetic review is next. No protected execution is authorized; environment destruction, direct-table policy and AUTH-02 remain separate gates.
+
+## PF-MVP-10 acceptance runner safety closure - 2026-10-30
+
+PF-SUP-2026-10-30-05 corrects the runnable package locally: exact per-command authority, database-comment target proof, empty/verified state gates, authorization-bound fixtures, real role/RLS and financial/inventory assertions, deterministic production-lock overlap, pinned PowerShell Core and bounded sanitized evidence are now authored. Independent source/synthetic review is the only next step. No target execution, cleanup, destruction, AUTH-02 or direct-table enforcement is authorized.
+
+## PF-MVP-10 executable acceptance-package readiness - 2026-10-30
+
+The reviewed chain through 000039 now has a target-neutral, runnable but unexecuted acceptance harness. Fail-closed authorization and runtime compatibility precede migration/application calls; SQL modules cover exact overload ACLs, provenance/isolation, effective entitlement, canonical retries, financial/inventory preservation, expired replay, evidence rollback and bounded concurrency. Next gates are independent package review and an owner-supplied disposable target/identity plus command-specific run authority. AUTH-02 and direct-table enforcement remain separate.
+
+## PF-SUP-2026-10-30-03 entitlement contract closure - 2026-10-30
+
+Forward-only unexecuted migration 000039 closes the inherited M-9 refund overload, gives the public entitlement read and every mutation guard one effective-decision resolver, and aligns intake/adjustment/transfer proof fingerprints with their sealed canonical contracts. The disposable proposal now names the complete active prerequisite chain through 000039 without inventing a target or identity. Source and injected-model evidence is ready for independent review. PostgreSQL parsing/application, catalog/grants/RLS, atomicity/concurrency, actual RPC/Auth and execution remain unverified; direct-table policy and AUTH-02 remain separately gated.
+
+## Entitlement migration lineage repair and canonical contract parity - 2026-10-30
+
+The malformed `20261029000037_consolidated_entitlement_enforcement_v1.sql` proposal is outside the executable migration directory. Its exact bytes remain in `docs/development/quarantined-proposals/` at SHA-256 `279376c9a1d94205e62ceba49d349b76c9c69c21f1ec6c2cf1dde5e393de7ce6`. The active additive chain proceeds through structurally clean foundation completion `20261030000037` and canonical parity migration `20261030000038`. Migration 38 renames and privately delegates to the latest effective sealed financial, inventory, transfer and staff bodies, placing exact-scope entitlement guards before them and restoring exact public signatures/grants. Production sale/refund gateways supply actor, tenant, branch, device, operation, client-operation and fingerprint provenance. This is local source/synthetic evidence only; PostgreSQL parsing/application, database behavior, concurrency, RLS, real RPC/Auth/provider and deployment remain unexecuted. Next gate: independent source review, then separately authorized disposable execution. AUTH-02 remains deferred.
+
+## PF-MVP-09S-FINAL Consolidated Privileged-Caller Security Closure and Disposable-Test Readiness - 2026-10-30
+
+The owner-authorized PF-MVP-09S-FINAL milestone delivers definitive operator provenance across all privileged operational RPCs (`rpc_ingest_sale_stock_movement`, `rpc_commit_sale_v1`, `rpc_process_sale_return_v2`), ensuring mutations cannot rely solely on `service_role` credentials or the mere presence of active pharmacy members. `rpc_ingest_sale_stock_movement` validates the initiating operator via `auth.uid()` or JWT claim `request.jwt.claim.sub` (or system principal `postgres`), rejecting missing operator identity with `42501 FORBIDDEN_OPERATOR`, and verifying active membership and `sales.create` permission. `rpc_commit_sale_v1` and `rpc_process_sale_return_v2` require explicit non-null operator parameter `p_actor_user_id`, verifying target membership and role-permission gates (`sales.create` and `sales.refund`). Replay authorization strictly requires a 64-character SHA-256 payload hash, strictly checks domain idempotency keys, and raises `23505 IDEMPOTENCY_VIOLATION` on hash mismatch. 1,343 assertions passed across all entitlement static, contract parity, and synthetic suites, with 43/43 suites passing in `scripts/run-tests.ts`. Next gate: independent GPT-6 acceptance review. Live database execution, Docker, and remote Supabase mutations remain unexecuted; AUTH-02 remains deferred.
+
+## PF-MVP-09S Final Entitlement Security Contract Closure and Disposable-Test Readiness - 2026-10-30
+
+The owner-authorized PF-MVP-09S milestone closes all remaining entitlement security findings and prepares disposable-test readiness. Trusted operator provenance is enforced for backend Edge Function calls (`service_role`) without blanket bypass by verifying target pharmacy existence and active operator membership (including `request.jwt.claim.sub` operator validation). Replay authorization bypasses are eliminated: replay strictly requires a valid 64-character hex SHA-256 payload hash, strictly checks domain idempotency keys (`client_op_id`, `dispatch_client_op_id`, `receive_client_op_id`), removes unverified primary-key matching (`OR id = p_operation_id`) and table fallbacks, and raises `23505 IDEMPOTENCY_VIOLATION` on hash mismatch. Operational RPC security boundaries and least-privilege grants are preserved: private mutations (`rpc_ingest_sale_stock_movement`, `rpc_commit_sale_v1`, `rpc_process_sale_return_v2`) require `TRUSTED_GATEWAY_REQUIRED` and are revoked from authenticated client access. Administrative suspension ordering evaluates effective dates and sequence numbers, honoring explicit reinstatements. 1,238 assertions passed across static and synthetic suites (0 failures). Next gate: independent GPT-6 acceptance review. Live database execution, Docker, and remote Supabase mutations remain unexecuted; AUTH-02 remains deferred.
+
+## PF-MVP-09R Consolidated Entitlement Enforcement Acceptance Hardening - 2026-10-30
+
+The owner-authorized PF-MVP-09R milestone completes acceptance hardening for server-authoritative entitlement enforcement across all eight operational SECURITY DEFINER RPCs (`rpc_ingest_sale_stock_movement`, `rpc_commit_sale_v1`, `rpc_process_sale_return`, `rpc_process_sale_return_v2`, `rpc_receive_inventory_stock`, `rpc_adjust_inventory_stock`, `rpc_dispatch_stock_transfer`, `rpc_receive_stock_transfer`, and staff management RPCs). Migration version collision is resolved by preserving `20261029000036_entitlement_foundation_security_closure_v1.sql` and advancing the unexecuted forward migration to `20261029000037_consolidated_entitlement_enforcement_v1.sql` (Version 37). Trusted backend caller identity handling is hardened to accept `service_role` (for Edge Functions `sync-push-sale`, `sync-push-return`, `sync-push-return-v2`) and active authenticated members, failing closed with SQLSTATE `28000` for unauthenticated non-service callers. Replay hardening binds idempotent offline recovery strictly to matching operation kinds, domain tables, caller pharmacy identity, and payload fingerprints (`23505 IDEMPOTENCY_VIOLATION` on mismatch), while preventing cross-operation replay forgery. Online staff management operations cannot be replayed offline. Administrative suspension ordering properly accounts for subsequent reinstatements, and all 8 historical read and recovery operations remain unconditionally authorized across all states. Next gate: independent GPT-6 acceptance review. PostgreSQL execution, Docker, remote migrations, and production activation remain unexecuted; AUTH-02 remains deferred.
+
+## PF-MVP-08 / BLK-003 Server-Authoritative Entitlement Foundation - 2026-10-29
+
+The owner-authorized PF-MVP-08 / BLK-003 milestone establishes server-authoritative entitlement state modeling and operation-level enforcement. All subscription boundaries strictly derive from PostgreSQL UTC clock (`timezone('utc', now())`). Draft forward migration `20261029000035_server_authoritative_entitlement_v1.sql` introduces the immutable `public.pharmacy_entitlement_anchors` audit ledger, `rpc_get_effective_entitlement_v1`, and `assert_pharmacy_mutation_entitled_v1`. Client clock time is strictly advisory. Protected mutations fail closed with `ENTITLEMENT_EXPIRED` or `ENTITLEMENT_UNKNOWN`, while historical reads and legitimate previously accepted offline replays remain unconditionally preserved. Next gate: independent source and synthetic security review. PostgreSQL execution, Auth/provider, remote migrations, and production activation remain unexecuted; AUTH-02 is deferred.
+
+## PF-SUP-2026-10-29-02 MVP-02-CLOSE correction - 2026-10-29
+
+The reviewed inventory mutation-response and preservation gaps are corrected as one cohesive local package. MVP-02 remains locally accepted only for inspected source, injected executors and isolated fake IndexedDB. Its next gates are independent review and protected browser/database acceptance. Entitlement `000035` was separated during this inventory milestone and subsequently completed under authorized milestone PF-MVP-08.
+
+## MVP-02-CLOSE inventory workflow integration - 2026-10-29
+
+MVP-02 is locally accepted at the source, injected-executor, in-memory helper and isolated fake-IndexedDB boundary. Catalog/snapshot ingestion, intake, adjustments, transfers, refresh preservation, stock/expiry attention, product detail and durable POS non-interference are integrated. The next MVP-02 gate is protected browser/database acceptance only; no additional local work substitutes for it. AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-28-04 MVP-02B rendering-boundary correction - 2026-10-29
+
+The ProductList runtime boundary now validates only the product and stock presentation fields it consumes. Malformed collections/rows render unavailable evidence rather than empty inventory; mixed valid rows remain visible; malformed stock rows present unknown rather than zero or adequate stock. Existing category/status filters and valid quantity presentation remain intact. Next gate: independent source/manifest review. Browser/datastore, database/RLS, authoritative stock and production acceptance remain unverified; AUTH-02 is deferred.
+
+## MVP-02B branch-scoped cached stock attention - 2026-10-28
+
+The missing honest low-stock UX is implemented locally without a server/snapshot/storage change. One production derivation supplies the panel and ProductList with current-branch cached projected quantities, validates all contributing evidence, preserves negative deficits and distinguishes missing groups from loaded empty groups. Search/truncation/staleness/incompatibility remain partial or unknown, and the 1-10 band is explicitly not a reorder threshold. Next gate: independent source/manifest review. Browser/IndexedDB, database/RLS, authoritative stock and production acceptance remain open; AUTH-02 is deferred.
+
+## PF-SUP-2026-10-28-02 product-detail publication correction
+
+The demonstrated InventoryView product-detail race is corrected locally through a production-used request/workspace/product publication coordinator. Deferred regressions cover both response orderings, A-to-B-to-A, stale success/failure interactions, close/reopen, workspace invalidation, unmount and association failure. The accepted strict expiry and POS/FEFO contract is preserved. Next gate: independent source/manifest review. Browser/IndexedDB timing, database/RLS, authoritative stock and production acceptance remain unverified; AUTH-02 is deferred.
+
+## Shared inventory expiry remediation - 2026-10-28
+
+The owner-approved exact batch-date and strict reference-date contract is implemented locally across snapshot/intake validation, FEFO selection, POS addition/finalization and inventory detail presentation. Malformed evidence blocks the complete operation without creating sale/queue effects or replacing the durable checkout reservation. Local pure, injected fake-IndexedDB, static and compiler evidence passes. Next gate: independent source/manifest review. Browser, database/RLS, authoritative stock and production acceptance remain open; AUTH-02 is deferred.
+
+## PF-SUP-2026-10-27-07 MVP-02A robustness correction
+
+The source-level loading/error precedence and malformed runtime-evidence findings are locally corrected. The production panel displays completed cache-read failure rather than perpetual loading, retry returns to genuine loading, and malformed collections/rows fail closed to unknown without crashing. Next gate: independent review of the correction report and manifest. This remains local synthetic evidence, not browser, IndexedDB, RLS, authoritative-stock or production acceptance; the shared parser defect and AUTH-02 remain open/deferred.
+
+## MVP-02A branch-scoped inventory expiry attention - 2026-10-27
+
+The owner-authorized local package adds a conservative, read-only expiry-attention panel over the already-loaded inventory cache. Strict local calendar validation, coherent pharmacy/branch binding, immutable cached projected rows and explicit complete/partial/unknown coverage are synthetically verified. Search/product limits and incompatible snapshot evidence cannot be presented as branch-wide safety. Next gate: independent source/manifest review. The shared operational expiry parser defect, browser/IndexedDB behavior, authoritative stock reconciliation, branch/RLS enforcement and production acceptance remain open; AUTH-02 is deferred.
+
+## MVP-01C read-only staff invitation oversight - 2026-10-27
+
+The owner-authorized local MVP-01C source package adds strict, read-only oversight through the existing M-16 `rpc_list_staff_invitations(UUID)` contract. Exact response allowlisting, coherent OWNER/MANAGER workspace checks, immutable publication and stale-request invalidation are locally tested. The existing navigation matrix, invitation acceptance form and every mutation contract remain unchanged. Next gate: independent review of the scoped report and manifest. Actual RPC/database/RLS/Auth/browser behavior remains unverified, AUTH-02 remains deferred, and MVP-01 remains incomplete at protected boundaries.
+
 ## Review reconciliation / I3A design gate — 2026-10-26
 
 Owner-supplied transcript evidence now records PF-SUP-02 corrected-I2 suitability, PF-SUP-05 local I3 boundary/parity acceptance and PF-SUP-06 unchanged hashes/missing export. The prior conditional-gate assessment remains historical. I3A authority-registry and disposable-acceptance design is complete without implementation or execution. Next gates are independent review, then separate owner choices for registry governance, identity-provider feasibility, harness authoring and a named disposable acceptance authorization. AUTH-02, provider feasibility, runtime mapping, provisioning, signup, activation, M4/MVP and release remain open/blocked.
@@ -243,6 +327,16 @@ The local BLK-015–017 corrections were subsequently reviewed at PF-SUP-2026-10
 
 PF-SUP-2026-10-26-10 corrects ACC-01 execution fidelity without restarting I3. Independent review of the new scoped manifest is the only next step. Protected execution remains blocked until the exact executable cases, pinned target, credential delivery, committed-fixture lifecycle, evidence and cleanup permissions are separately authorized. Durable recovery concurrency, reservation/revocation concurrency, confirmed consumption and provider feasibility remain open; REV-LIN-01 and AUTH-02 remain deferred.
 
+PF-SUP-2026-10-26-11 closes the two local runner defects without reopening PF-SUP-10: coordinator mutation cardinality is explicit and advisory lock components are unsigned and shared. The next step is independent review of the PF-SUP-11 manifest, not execution. PostgreSQL lock parity and all unsupported cases remain open under their existing gates; AUTH-02 is deferred and REV-LIN-01 is undecided.
+
+## MVP-01B membership workspace checkpoint — 2026-10-27
+
+- **OWNER-AUTHORIZED LOCAL BATCH:** explicit session-only branch selection, fail-closed workspace publication, production-used request-generation guards, isolated tests, static wiring evidence and documentation only.
+- **SOURCE-ALIGNED ELIGIBILITY:** the client mirrors the existing `has_branch_access` source contract: OWNER/MANAGER may choose among branches returned for the selected pharmacy; other active roles require their returned `default_branch_id`. The default identifier alone never establishes access.
+- **UX CONTRACT:** one eligible branch is selected automatically, multiple eligible branches require a fresh session choice, and zero eligible branches keeps operational content unmounted. The existing pharmacy preference remains only a revalidated hint; no branch preference is stored.
+- **DEPENDENCY EFFECT:** MVP-01's local membership-workspace UX gap advances without changing onboarding, invitations, RPCs, migrations, subscription, synchronization or financial contracts. Staff management, account recovery and protected Auth/database/browser acceptance remain outside this batch.
+- **NEXT GATE:** independent source/synthetic review. Do not treat this checkpoint as RLS, Auth, browser or production acceptance; AUTH-02 remains deferred.
+
 ## Next proposed protected batch
 
 ## BLK-002 ACC-01 checkpoint
@@ -255,3 +349,13 @@ PF-SUP-2026-10-26-08 corrections now pin an authoritative destination proof, nar
 2. Require committed, identity-guarded fixtures for cross-session M-18/Refund V2 and cross-tab/restart cases; an enclosing rollback transaction is insufficient evidence.
 3. Preserve sealed migrations, Refund V2 contracts and the independently reviewed C-01–C-04 corrections. Do not begin dependent financial features without a demonstrated defect.
 4. Deployment, production access and Git mutation remain unauthorized and separate from acceptance execution. StoreFlow access is permanently prohibited for this workstream and cannot be authorized by a Phase B request.
+
+PF-SUP-2026-10-26-12 accepts the local two-point runner closure and authorizes no execution. The subsequent owner-authorized source-only batch prepares reservation-first and revocation-first scenarios using the actual reserve/admission RPCs and their shared production email lock. The committed admission fixtures are RPC-created and immutable results are preserved. Independent review of the new scoped manifest is next; PostgreSQL execution, AUTH-02, provider/Auth/browser work and REV-LIN-01 remain separate gates.
+
+PF-SUP-2026-10-26-16 aligns ACC-01 source with the owner-approved REV-LIN-01 implementation in preserved migrations `000033`–`000034`. The next step is independent review of the alignment manifest only. PostgreSQL execution remains separately gated; trusted-subject completion/replay/audit cases and confirmed continuation remain blocked by deferred AUTH-02, while durable recovery concurrency remains not implemented pending a reviewed provider-resolution fixture/outcome contract.
+
+PF-MVP-08 foundation security closure is locally ready for independent review. The next milestone is not implementation: owner acceptance followed by explicit protected scope for route-by-route entitlement wiring, legacy callable disposition and direct-table mutation enforcement. Database execution and AUTH-02 remain separate gates.
+
+PF-SUP-2026-10-29-04 completes the local foundation acceptance corrections with additive `000037`. Independent review of the new report/manifest is next. The committed-evidence producer is not connected to business transactions; route wiring, database/concurrency acceptance and legacy/direct-table policy remain separately protected milestones.
+
+PF-SUP-2026-10-30-01 supersedes PF-MVP-09/R/S readiness claims. The next gate is an explicit owner choice to replace the malformed competing migration in place or move it outside the executable namespace and author a new parity migration. No disposable execution scope may be requested before that source correction is independently accepted.

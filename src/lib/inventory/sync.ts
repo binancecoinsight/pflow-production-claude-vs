@@ -252,7 +252,7 @@ export const ingestAuthoritativeSnapshot = async (
     pharmacy_id: normPharmacy,
     products: snapshot.products.map((p) => ({
       id: p.id,
-      pharmacy_id: normPharmacy,
+      pharmacy_id: p.pharmacy_id,
       name: p.name,
       sku: p.sku,
       barcode: p.barcode,
@@ -266,7 +266,7 @@ export const ingestAuthoritativeSnapshot = async (
     })),
     batches: snapshot.batches.map((b) => ({
       id: b.id,
-      pharmacy_id: normPharmacy,
+      pharmacy_id: b.pharmacy_id,
       product_id: b.product_id,
       branch_id: b.branch_id,
       batch_number: b.batch_number,

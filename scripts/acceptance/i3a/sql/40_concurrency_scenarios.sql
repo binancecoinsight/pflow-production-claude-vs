@@ -8,7 +8,16 @@
 -- Executable cases invoke actual application RPCs:
 -- OPERATION_COLLISION_PENDING_FIRST: identity-begin RPC holds the operation lock; admission RPC conflicts.
 -- OPERATION_COLLISION_COMPLETED_FIRST: admission RPC holds the operation lock; identity-begin RPC conflicts.
--- DURABLE_PENDING_RECOVERY is NOT IMPLEMENTED as concurrency proof because the recovery RPC has no
--- observable application lock. RESERVATION_REVOCATION is BLOCKED pending a reviewed committed-fixture
--- lifecycle. CONSUMPTION_REVOCATION is Auth-policy BLOCKED and has no direct-row substitute.
--- REV-LIN-01 is intentionally absent: it remains policy-blocked and cannot be classified PASS.
+-- RESERVATION_REVOCATION_RESERVATION_FIRST: the reserve RPC holds the production applicant/email
+-- lock hashtextextended(email_digest,1); admission revocation waits, then succeeds. The request stays
+-- RESERVED because it linearized against the active admission before the revocation committed.
+-- RESERVATION_REVOCATION_REVOCATION_FIRST: admission revocation holds that same production lock;
+-- reservation waits, then fails PI010 against the inactive admission and creates no request/operation.
+-- Each ordering starts from its own committed active admission created by the admission RPC in
+-- 41_reservation_first_fixture.sql or 42_revocation_first_fixture.sql. No direct business-table setup
+-- and no harness-created serialization are used.
+-- DURABLE_PENDING_RECOVERY remains NOT IMPLEMENTED as concurrency proof: v4 exposes the operation
+-- lock, but provider-resolution outcomes and a reviewed committed pending-fixture lifecycle are not
+-- part of this source-alignment package. CONSUMPTION_REVOCATION is AUTH-02 BLOCKED and has no
+-- direct-row substitute. REV-LIN-01 phase boundaries have rollback-only sequential cases in
+-- 26_identity_phase_assertions.sql; those are not PostgreSQL concurrency acceptance.

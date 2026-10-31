@@ -20,9 +20,9 @@ BEGIN
 
  PERFORM set_config('request.jwt.claims',jsonb_build_object('role','pharmacyflow_owner_gateway_executor','aud','pharmacyflow-owner-i3','pharmacyflow_principal_class','GATEWAY','sub','i3a-gateway-0001','pharmacyflow_credential_version','1')::text,true);
  cmd:=public.private_i3_command_fingerprint_v1(ARRAY['owner-gateway-operator-v1','IDENTITY_ISSUE','i3a-gateway-0001',k,ctx::text,'20000000-0000-4000-8000-000000000302','30000000-0000-4000-8000-000000000301','30000000-0000-4000-8000-000000000301','50000000-0000-4000-8000-000000000301',fp,'owner.i3a.001@example.invalid','Owner I3A']);
- begun:=public.rpc_gateway_begin_owner_identity_v3('20000000-0000-4000-8000-000000000302','30000000-0000-4000-8000-000000000301',k,ctx,'30000000-0000-4000-8000-000000000301','50000000-0000-4000-8000-000000000301',fp,'owner.i3a.001@example.invalid','Owner I3A',cmd);
+ begun:=public.rpc_gateway_begin_owner_identity_v4('20000000-0000-4000-8000-000000000302','30000000-0000-4000-8000-000000000301',k,ctx,'30000000-0000-4000-8000-000000000301','50000000-0000-4000-8000-000000000301',fp,'owner.i3a.001@example.invalid','Owner I3A',cmd);
  IF begun->>'state'<>'PROVIDER_PENDING' OR (SELECT state FROM public.owner_eligibility_requests WHERE request_id='30000000-0000-4000-8000-000000000301')<>'AUTH_CREATE_PENDING' THEN RAISE EXCEPTION 'begin boundary did not perform valid transition'; END IF;
- recovered:=public.rpc_gateway_recover_owner_identity_v3('20000000-0000-4000-8000-000000000302','30000000-0000-4000-8000-000000000301',k,ctx,'30000000-0000-4000-8000-000000000301','50000000-0000-4000-8000-000000000301',fp,'owner.i3a.001@example.invalid','Owner I3A',cmd);
+ recovered:=public.rpc_gateway_recover_owner_identity_v4('20000000-0000-4000-8000-000000000302',k,ctx);
  IF recovered->>'state'<>'PROVIDER_PENDING' OR recovered->'result' IS DISTINCT FROM 'null'::jsonb OR NOT (recovered ? 'result') THEN RAISE EXCEPTION 'DURABLE_PENDING_RECOVERY exact boundary replay failed'; END IF;
 
  PERFORM set_config('request.jwt.claims',jsonb_build_object('role','pharmacyflow_platform_admission_operator','aud','pharmacyflow-owner-i3','pharmacyflow_principal_class','PLATFORM_OPERATOR','sub','i3a-operator-0001','pharmacyflow_credential_version','1')::text,true);

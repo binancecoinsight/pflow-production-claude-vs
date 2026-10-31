@@ -1,5 +1,245 @@
 # PharmacyFlow Progress Ledger
 
+## PF-MVP-10 native-client conformance and final execution-gate handoff - PF-SUP-2026-10-31-03
+
+- **PREFIX BINDING:** optional native `psql:file:line:` prefixes are accepted only for the exact approved `-f` input and an in-range positive line. Paths are normalized, removed before validation and never retained.
+- **NOTICE POLICY CORRECTED:** actual relation, column-of-relation, policy/trigger-for-relation, constraint-of-relation and `pgcrypto` skip notices are narrowly accepted and discarded. Unknown notices and malformed context remain rejected.
+- **SOURCE-FAITHFUL REHEARSAL:** normal dispatch and the actual concurrency coordinator cover paths with spaces, prefixed migration/worker notices, malformed/unrelated sources, secrets, nonzero exits, cancellation and cleanup refusal.
+- **REGRESSION RESULTS:** package `53 passed`; emitter/consumer `36 passed`; native-client `6 passed`; bridge `15 passed`; whole-command `16 passed`; actual coordinator `4 passed`; PowerShell `9 files clean`; SQL lexical `14 files clean`; focused/root compilation passed.
+- **LIMIT:** transcript conformance remains representative local evidence. PostgreSQL acceptance is unexecuted and pending separate authority.
+
+## PF-MVP-10 emitter/consumer conformance closure - PF-SUP-2026-10-31-02
+
+- **SQL/CONSUMER RECONCILED:** all 14 executable SQL modules have an explicit consumer; transactional scenarios emit one success frame; migration notices use a narrow validate-and-discard policy.
+- **SHARED RUNTIME CONTRACT:** normal dispatch, concurrency and tests use `PF_PASS|runtime|<server-version-number>|target-verified` through one production pattern.
+- **ACTUAL COORDINATOR REHEARSED:** controlled process adapters drive the production concurrency coordinator through runtime/package/setup, readiness, blocker proof, terminal outcomes, exact effect counts, timeout, cancellation, abort verification and worker accounting.
+- **RETENTION CLOSED:** workers retain exactly READY and TERMINAL for the expected actor. Unexpected result/count/pass frames, extra actors, duplicates, malformed/secret fields and unframed output reject without retention.
+- **LOCAL RESULTS:** emitter/consumer static `34 passed`; actual coordinator `4 passed`; package static `50 passed`; bridge `15 passed`; whole-command `16 passed`; PowerShell `8 files clean`; SQL lexical `14 files clean`; focused/root compilation passed.
+- **LIMIT:** representative transcripts are source-conformance evidence only. PostgreSQL parsing/execution and protected acceptance remain NOT RUN.
+
+## PF-MVP-10 whole-command acceptance closure - PF-SUP-2026-10-31-01
+
+- **EXECUTION INVENTORY:** a fresh 61-entry inventory contains all 41 active migrations through 000039 and exactly 20 current execution dependencies. Historical review manifests remain unchanged and are not executable inventories.
+- **WHOLE-COMMAND REHEARSAL:** all five documented commands pass actual authorization validation, inventory loading, dispatch, structured result handling and evidence publication with protected process execution replaced in memory. Result: `16 passed`.
+- **FAIL CLOSED:** missing permissions, incomplete inventories, cancellation, ownership failure, malformed/secret diagnostics and invalid concurrency results reject without relying on `$LASTEXITCODE`.
+- **LOCAL RESULTS:** package static `50 passed`; injected TypeScript preflight passed; production bridge `15 passed`; whole-command surface `16 passed`; PowerShell `7 files clean`; C# compiled; SQL lexical `14 files clean`; focused/root compilation passed.
+- **BOUNDARY:** no protected execution occurred. PostgreSQL parsing/execution, real concurrency, RPC/Auth/provider/browser/network/service access, AUTH-02 and direct-table enforcement remain open.
+
+## PF-MVP-10 production-path integration closure - PF-SUP-2026-10-30-06
+
+- **LOCAL CORRECTION COMPLETE:** the default PowerShell-to-C# bridge is exercised through an in-memory process adapter; automatic-variable collisions are removed; environment and argument vectors are exact and space-safe.
+- **CONTRACTS CORRECTED:** one `PF_EVENT` protocol proves readiness, distinct backend identity, blocker evidence and terminal results. M-13 concurrency expects the sealed `23505` conflict. Refund V2 separates fresh-nonce replay, nonce reuse, changed payload and expired committed replay and expects three authoritative nonces.
+- **EVIDENCE PRESERVED:** cleanup validates authorization-bound ownership and exact dependencies, then explicitly refuses deletion. It never disables immutable guards or deletes audit/ledger evidence; environment destruction remains separately gated.
+- **LOCAL RESULTS:** package static `46 passed`; injected preflight/orchestration passed; production-bridge/process/transcript rehearsal `15 passed`; PowerShell `5 files clean`; C# compiled; SQL lexical `14 files clean`; focused/root no-emit compilation passed.
+- **BOUNDARY:** local source/static/injected/compiler evidence only. PostgreSQL parsing/execution, RPC/Auth/provider/browser/network/service access and every protected action remain NOT RUN.
+
+## PF-MVP-10 runner safety/evidence closure - PF-SUP-2026-10-30-05
+
+- **LOCAL CORRECTION COMPLETE:** command permissions are consistent; target/package/fixture ownership gates, valid SQL fixtures, exact evidence-boundary rollback, API-role/RLS and financial/refund cases, deterministic lock overlap, pinned PowerShell and bounded sanitized process evidence are implemented.
+- **LOCAL RESULTS:** injected TypeScript preflight/orchestration passed; injected PowerShell process-boundary `11 passed`; package static `41 passed`; PowerShell `5 files clean`; C# compiled; SQL lexical `14 files clean`; focused/root no-emit compilation passed.
+- **PRESERVED:** application/security source, migrations 000000–000039, historical manifests and accepted inventory/POS work were not modified.
+- **NOT RUN:** PostgreSQL parsing/execution and every protected/external scenario. Independent review is next; AUTH-02, cleanup execution, environment destruction and direct-table enforcement remain separate gates.
+
+## PF-MVP-10 executable acceptance-package readiness - 2026-10-30
+
+- **AUTHORED ONLY:** isolated `pf-mvp-10` contract, preflight, executor, runtime/ACL/transaction/concurrency SQL, cleanup, injected tests and review documents.
+- **FAIL CLOSED:** unavailable owner target/identity fields remain unresolved; the example is `DRAFT_NOT_AUTHORIZED`; rejection/cancellation produces zero executor calls.
+- **RUNTIME:** requires PostgreSQL 15+ with Supabase `auth`/`extensions`, API roles, `pgcrypto`, `auth.uid()` and `auth.jwt()`; no permissive substitute exists.
+- **LOCAL RESULTS:** injected preflight pass; 24 package assertions; 3 PowerShell files parse; 7 SQL files lexical-clean; focused/root no-emit compilation pass.
+- **NOT RUN:** all protected execution and external access. Independent review and precise owner execution authorization remain required.
+
+## PF-SUP-2026-10-30-03 entitlement contract closure - 2026-10-30
+
+- **OWNER AUTHORIZED:** local source/test/document changes and one new forward-only unexecuted correction migration; no protected execution.
+- **BASELINE EXPOSED:** closure regression initially reported 3 passes and 17 findings across the missing M-9 overload guard, read/guard decision divergence and M-13 fingerprint mismatch.
+- **CORRECTED:** 000039 preserves all earlier migrations, closes all three refund signatures, centralizes effective entitlement, and supplies sealed-equivalent fingerprint helpers for intake, adjustment, dispatch and receive.
+- **EVIDENCE:** closure source 30; injected model 23; existing parity 114; canonical wiring 92; foundation static 11 + 25; legacy wiring 61; lifecycle/capability 15 + 9; foundation behavior 52; entitlement behavior 1,004; gateway 70; focused/root compilation pass.
+- **LIMIT:** lexical and injected evidence only. PostgreSQL parsing/application, RLS/catalog/grants, transactions/concurrency, RPC/Auth/browser/network and deployment were not run. Direct-table policy and AUTH-02 remain open.
+
+## Entitlement migration lineage repair and canonical contract parity - 2026-10-30
+
+- **OWNER AUTHORIZED:** exact malformed proposal quarantine; one chronological additive correction; contract-parity guards/wrappers; legacy availability; gateway proof integration; focused regressions and evidence.
+- **LINEAGE:** pre/post move SHA-256 is `279376c9a1d94205e62ceba49d349b76c9c69c21f1ec6c2cf1dde5e393de7ce6`; the destination was absent before moving; historical manifests were not edited. Active chain: `20261029000035` -> `20261029000036` -> `20261030000037` -> `20261030000038`.
+- **IMPLEMENTED:** migration 38 privately renames the latest sealed RPCs and restores same-signature wrappers. Financial/private routes require service-role plus exact gateway provenance; replay evidence binds pharmacy, branch, operation, client operation, actor, device, fingerprint and committed domain outcome. Inventory/staff wrappers retain sealed permission, arithmetic, lifecycle and response behavior. Legacy return stays authenticated and guarded without invented replay proof.
+- **LOCAL EVIDENCE:** contract parity 114; canonical wiring 92; foundation security 11; foundation acceptance 25; legacy wiring 61; lifecycle 15; capability boundary 9; foundation behavior 52; entitlement behavior 1,004; sale gateway 70. Focused/root TypeScript compilation pass. Final checks are in the completion report.
+- **LIMIT:** lexical inspection is not PostgreSQL parsing/application. No protected execution occurred. Direct-table enforcement remains a protected policy choice. AUTH-02 remains deferred.
+
+## PF-MVP-09S-FINAL Consolidated Privileged-Caller Security Closure and Disposable-Test Readiness - 2026-10-30
+
+- **OWNER AUTHORIZED:** Formally authorized under `PHARMACYFLOW — PROPOSED OWNER AUTHORIZATION: PF-MVP-09S-FINAL` to establish definitive evidence that all privileged sale, refund, and synchronization RPCs validate the actual initiating operator or an explicitly authorized system principal, and cannot rely solely on `service_role` identity or the mere existence of active pharmacy members; and verify actual source definitions for migration ordering, private RPC execution privileges, strict replay proof, transaction-preserving idempotency, suspension precedence, and protected historical reads.
+- **PRIVILEGED OPERATOR PROVENANCE HARDENING (`000037`):**
+  1. *Initiating-Operator Provenance in Privileged RPCs:*
+     - `rpc_ingest_sale_stock_movement`: Requires initiating operator identity via `auth.uid()` or JWT sub claim (`request.jwt.claim.sub`) for `service_role` callers (or system principal `postgres`), rejecting missing operator identity with `42501 FORBIDDEN_OPERATOR: Initiating operator identity required for privileged ingestion`. Verifies active membership in target pharmacy (`42501 FORBIDDEN_PHARMACY`) and `sales.create` permission (`42501 FORBIDDEN_PERMISSION`).
+     - `rpc_commit_sale_v1`: Strictly requires explicit initiating operator parameter `p_actor_user_id IS NOT NULL` (`42501 FORBIDDEN_OPERATOR: Initiating operator ID is required`). Verifies active membership in target pharmacy (`42501 FORBIDDEN_PHARMACY`) and `sales.create` permission (`42501 FORBIDDEN_PERMISSION`).
+     - `rpc_process_sale_return_v2`: Strictly requires explicit initiating operator parameter `p_actor_user_id IS NOT NULL` (`42501 FORBIDDEN_OPERATOR: Initiating operator ID is required`). Verifies active membership in target pharmacy and `sales.refund` permission (`42501 FORBIDDEN_REFUND_AUTHORIZATION`).
+  2. *Replay & Idempotency Proof:*
+     - Replay authorization strictly requires non-null 64-character SHA-256 payload hash (`p_payload_hash ~ '^[0-9a-fA-F]{64}$'`), strictly checks domain idempotency columns (`client_op_id`, `dispatch_client_op_id`, `receive_client_op_id`), removes unverified primary-key matching (`OR id = p_operation_id`) and table fallbacks, and raises `23505 IDEMPOTENCY_VIOLATION` on hash mismatch.
+  3. *Operational RPC Execution Privileges & Containment:*
+     - `rpc_ingest_sale_stock_movement`, `rpc_commit_sale_v1`, and `rpc_process_sale_return_v2` are revoked from `PUBLIC, anon, authenticated` and granted strictly to `service_role`.
+  4. *Administrative Suspension & Migration Ordering:*
+     - Deterministic sequence ordering honors explicit reinstatements. Monotonic migration ordering `000035` < `000036` < `000037` strictly preserved.
+- **EXECUTED LOCAL EVIDENCE:**
+  - `entitlement-enforcement-wiring.test.mjs`: 90 passed.
+  - `entitlement-wiring.test.mjs`: 61 passed.
+  - `entitlement-foundation-security.test.mjs`: 11 passed.
+  - `entitlement-foundation-acceptance.test.mjs`: 25 passed.
+  - `entitlement-contract-parity.test.mjs`: 79 passed; quarantined structure errors: 4.
+  - `src/lib/subscription/lifecycle.test.ts`: 15 passed.
+  - `src/lib/subscription/capabilityBoundary.test.ts`: 9 passed.
+  - `src/lib/subscription/foundationSecurity.test.ts`: 49 passed.
+  - `src/lib/subscription/entitlement.test.ts`: 1,004 passed.
+  - Total passed assertions across entitlement suites: **1,343 passed**.
+  - `scripts/run-tests.ts`: 43 / 43 test suites passed.
+  - Strict TypeScript compilation (`tsconfig.entitlement.json`): PASS (0 diagnostics).
+  - Root TypeScript compilation (`tsconfig.json`): PASS (0 diagnostics).
+  - Whitespace & formatting check (`git diff --check`): PASS (0 errors).
+- **NOT RUN / LIMIT:** Zero database execution, zero Docker, zero remote network/Auth calls, zero Git staging/commits. Migrations 000035, 000036, and 000037 remain forward-only unexecuted SQL. AUTH-02 remains deferred. Stop for independent GPT-6 acceptance review.
+
+## PF-MVP-09S Final Entitlement Security Contract Closure and Disposable-Test Readiness - 2026-10-30
+
+- **OWNER AUTHORIZED:** Formally authorized under `PHARMACYFLOW — PROPOSED OWNER AUTHORIZATION: PF-MVP-09S` to consolidate and resolve all remaining entitlement findings: trusted operator provenance for `service_role` Edge Function calls, elimination of replay authorization bypasses, verification and preservation of operational RPC security boundaries, direct client containment of formerly private operations, and administrative suspension/reinstatement precedence ordering.
+- **SECURITY CONTRACT CLOSURE & HARDENING (`000037`):**
+  1. *Trusted Operator Provenance without Blanket Bypass:* Eliminated blanket `service_role` bypass in `rpc_get_effective_entitlement_v1` and `assert_pharmacy_mutation_entitled_v1`. Calls from backend gateways verify that target `p_pharmacy_id` exists (`PHARMACY_NOT_FOUND`) and has active membership (`FORBIDDEN_PHARMACY`), and if an operator user claim (`request.jwt.claim.sub`) is provided, verifies active membership for that operator (`FORBIDDEN_OPERATOR`).
+  2. *Replay Authorization Bypass Elimination:* Replay is strictly gated on non-null 64-character SHA-256 payload hash (`p_payload_hash ~ '^[0-9a-fA-F]{64}$'`). Missing or malformed hashes immediately skip replay and evaluate live entitlement. All unverified primary-key matching (`OR id = p_operation_id`) and table fallbacks (`SELECT 1 FROM sales WHERE id = p_operation_id`) are eliminated; replay strictly checks domain idempotency columns (`client_op_id`, `dispatch_client_op_id`, `receive_client_op_id`). Incomplete or missing server hash denies replay; mismatched hash raises `23505 IDEMPOTENCY_VIOLATION`.
+  3. *Operational RPC Security Boundaries & Private Operation Containment:* Re-asserted execution grants across all 8 operational RPCs. `rpc_ingest_sale_stock_movement`, `rpc_commit_sale_v1`, and `rpc_process_sale_return_v2` are revoked from `PUBLIC, anon, authenticated` and restricted to `service_role`. `rpc_ingest_sale_stock_movement` enforces `TRUSTED_GATEWAY_REQUIRED` and active pharmacy membership in its prelude.
+  4. *Administrative Precedence & Suspension Ordering:* Administrative decisions in `entitlement_administrative_decisions_v1` filtered by `effective_at <= v_now` and ordered by `effective_at DESC, decision_sequence DESC, id DESC LIMIT 1` properly lift administrative suspensions when `decision_kind IN ('REINSTATE', 'ALLOW_MUTATIONS')`.
+  5. *Monotonicity & Historical Preservation:* Migration ordering `000035` < `000036` < `000037` strictly preserved with unique version timestamps. All 8 historical read and recovery operations remain unconditionally authorized across all states.
+- **EXECUTED LOCAL EVIDENCE:**
+  - `entitlement-enforcement-wiring.test.mjs`: 89 passed.
+  - `entitlement-wiring.test.mjs`: 61 passed.
+  - `entitlement-foundation-security.test.mjs`: 11 passed.
+  - `src/lib/subscription/lifecycle.test.ts`: 15 passed.
+  - `src/lib/subscription/capabilityBoundary.test.ts`: 9 passed.
+  - `src/lib/subscription/foundationSecurity.test.ts`: 49 passed.
+  - `src/lib/subscription/entitlement.test.ts`: 1,004 passed.
+  - Total passed assertions: **1,238 passed** (0 failures).
+  - Strict TypeScript compilation (`tsconfig.entitlement.json`): PASS (0 diagnostics).
+  - Root TypeScript compilation (`tsconfig.json`): PASS (0 diagnostics).
+  - Whitespace & formatting check (`git diff --check`): PASS (0 errors).
+- **NOT RUN / LIMIT:** Zero database execution, zero Docker, zero remote network/Auth calls, zero Git staging/commits. Migrations 000035, 000036, and 000037 remain forward-only unexecuted SQL. AUTH-02 remains deferred. Stop for independent GPT-6 acceptance review.
+
+## PF-MVP-09R Consolidated Entitlement Enforcement Acceptance Hardening - 2026-10-30
+
+- **OWNER AUTHORIZED:** Formally authorized under `PHARMACYFLOW — PROPOSED OWNER AUTHORIZATION: PF-MVP-09R` to complete acceptance hardening across migration monotonicity, trusted caller identity handling (`service_role` and `authenticated`), sealed RPC parity across all 8 operational paths, Edge Function mutation protection, anti-forgery replay hardening, and administrative suspension ordering.
+- **CONSOLIDATED SERVER ENFORCEMENT & ACCEPTANCE HARDENING (`000037`):**
+  1. *Migration Monotonicity & Version Collision Resolution:* Preserved `20261029000036_entitlement_foundation_security_closure_v1.sql` intact without modification. Authored forward-only unexecuted SQL migration `20261029000037_consolidated_entitlement_enforcement_v1.sql` (Version 37), strictly maintaining monotonic order `000035` < `000036` < `000037` with zero applied migrations deleted or rewritten.
+  2. *Trusted Gateway Caller Identity Hardening:* Hardened `rpc_get_effective_entitlement_v1` and `assert_pharmacy_mutation_entitled_v1` to explicitly recognize trusted backend gateway callers (`service_role`) via `coalesce(auth.role(), '') = 'service_role' OR coalesce(current_setting('request.jwt.claim.role', true), '') = 'service_role' OR current_user = 'service_role'`. For `authenticated` client callers, verified active membership (`is_pharmacy_member`) or platform admin authority before evaluating entitlement or replay. Unauthenticated callers without `service_role` fail closed with `28000 AUTH_REQUIRED`.
+  3. *Sealed Operational RPC Preludes Across All 8 Pathways:* Overrode all 8 operational SECURITY DEFINER RPCs (`rpc_ingest_sale_stock_movement`, `rpc_commit_sale_v1`, `rpc_process_sale_return`, `rpc_process_sale_return_v2`, `rpc_receive_inventory_stock`, `rpc_adjust_inventory_stock`, `rpc_dispatch_stock_transfer`, `rpc_receive_stock_transfer`, and staff RPCs `rpc_create_staff_invitation`, `rpc_accept_staff_invitation`, `rpc_revoke_staff_invitation`, `rpc_change_member_role`, `rpc_reactivate_pharmacy_member`, `rpc_suspend_pharmacy_member`) with server-authoritative preludes calling `assert_pharmacy_mutation_entitled_v1`. Preserved all signatures, parameters, locking (`FOR UPDATE`), arithmetic, return structures, and financial invariants from original sealed definitions.
+  4. *Edge Function Entry Point Protection:* Verified that backend Edge Functions (`sync-push-sale`, `sync-push-return`, `sync-push-return-v2`) executing with `service_role` credentials are strictly guarded by evaluating target tenant entitlement before permitting mutations.
+  5. *Replay Hardening & Anti-Forgery:* Scoped replay bypass strictly to matching domain tables (`sales`, `sale_returns`, `purchases`, `stock_adjustments`, `stock_transfers`), target caller pharmacy identity, and payload hash. Cross-operation replay forgery (e.g. attempting to authorize stock intake via a committed sale ID) and cross-tenant replay are strictly rejected. Staff management operations are explicitly non-replayable.
+  6. *Administrative Suspension Ordering & FORCE RLS:* Applied `FORCE ROW LEVEL SECURITY` across `public.subscriptions`, `public.subscription_plans`, `public.pharmacy_entitlement_anchors`, and `public.entitlement_administrative_decisions_v1`, revoking DML from client roles. Evaluated administrative suspension using deterministic ordering (`ORDER BY effective_at DESC, decision_sequence DESC, id DESC LIMIT 1`), properly recognizing explicit reinstatements. Unconditionally preserved all 8 historical read and recovery operations across all states.
+- **EXECUTED LOCAL EVIDENCE:**
+  - `entitlement-enforcement-wiring.test.mjs`: 78 passed.
+  - `entitlement-wiring.test.mjs`: 61 passed.
+  - `entitlement-foundation-security.test.mjs`: 11 passed.
+  - `src/lib/subscription/lifecycle.test.ts`: 15 passed.
+  - `src/lib/subscription/capabilityBoundary.test.ts`: 9 passed.
+  - `src/lib/subscription/foundationSecurity.test.ts`: 24 passed.
+  - `src/lib/subscription/entitlement.test.ts`: 941 passed.
+  - Strict TypeScript compilation (`tsconfig.entitlement.json`): PASS (0 diagnostics).
+  - Root TypeScript compilation (`tsconfig.json`): PASS (0 diagnostics).
+  - Whitespace & formatting check (`git diff --check`): PASS (0 errors).
+- **NOT RUN / LIMIT:** Zero database execution, zero Docker, zero remote network/Auth calls, zero Git staging/commits. Migrations 000035, 000036, and 000037 remain forward-only unexecuted SQL. AUTH-02 remains deferred. Stop for independent review.
+
+## PF-MVP-08 / BLK-003 Server-Authoritative Entitlement Foundation - 2026-10-29
+
+- **OWNER AUTHORIZED:** Formally authorized under `PHARMACYFLOW — PF-MVP-08 CONSOLIDATED MILESTONE MASTER PROMPT` to resolve all seven security/contract findings from PF-SUP-2026-10-29-02.
+- **SEVEN DEFECTS RESOLVED:**
+  1. *Membership-First Replay Guard:* `assert_pharmacy_mutation_entitled_v1` enforces caller authentication and active tenant membership before any replay inspection.
+  2. *PharmacyFlow Schema Alignment:* Replaced StoreFlow `sync_idempotency_log` references with PharmacyFlow's authoritative `public.sync_journal` and domain tables (`sales`, `sale_returns`, `purchases`, `stock_adjustments`, `stock_transfers`).
+  3. *Active Anchor Ledger:* `public.pharmacy_entitlement_anchors` is populated via automated trigger `trg_subscriptions_entitlement_anchor` on `public.subscriptions` and platform admin procedure `rpc_record_entitlement_anchor_v1`.
+  4. *M-3 Compatibility & Administrative Suspension:* `public.subscriptions` status retains sealed CHECK constraint (`TRIAL, ACTIVE, PAST_DUE, CANCELLED, EXPIRED`); `pharmacy_entitlement_anchors` supports `'SUSPENDED'`, and `rpc_get_effective_entitlement_v1` derives administrative suspension from the anchor ledger.
+  5. *Operation Enforcement Matrix:* Produced exhaustive 11-pathway enforcement matrix identifying sealed RPC bypasses, release-blocking status, and narrowly proposed future migration `000036`.
+  6. *Exhaustive Client Validation:* `resolveAuthoritativeEntitlement` strictly validates `pharmacy_id`, `state`, `mutations_allowed`, `historical_reads_allowed`, and `server_time`.
+  7. *Inactive Injected Adapters:* Added `entitlementAdapter.ts` with `createRpcEntitlementAdapter` and `createOfflineFallbackEntitlementAdapter` for network-unavailable handling without live network calls.
+- **EXECUTED LOCAL EVIDENCE:** Unit tests `entitlement.test.ts` (483 passed), `lifecycle.test.ts` (15 passed), `capabilityBoundary.test.ts` (9 passed); static wiring assertions `entitlement-wiring.test.mjs` (60 passed); upstream wiring `mvp02-close-wiring.test.mjs` (56 passed); focused compilation `tsconfig.entitlement.json` (PASS); root compilation `tsconfig.json` (PASS); whitespace check `git diff --check` (PASS).
+- **NOT RUN / LIMIT:** Zero database execution, zero Docker, zero remote network/Auth calls, zero Git staging/commits. PostgreSQL atomicity, RLS enforcement, and production integration remain unexecuted. AUTH-02 remains deferred. Stop for independent review.
+
+## PF-SUP-2026-10-29-02 MVP-02-CLOSE correction - 2026-10-29
+
+- **CORRECTED:** all four mutation response boundaries now match sealed operation-specific replay, identity, status, timestamp, cardinality and arithmetic guarantees. Dispatch exact replay legitimately accepts `RECEIVED` after lifecycle advancement.
+- **STRENGTHENED:** response contracts `101/101`; integrated preservation `42/42`; directly affected existing suites `385/385`; static `56/56`; focused/root compilation pass.
+- **PRESERVED:** rejected snapshots compare complete cache records and metadata; inventory workflows compare complete draft, sale, transaction and queue values. RPC requests, accounting and protected server contracts are unchanged.
+- **SEPARATE:** entitlement `000035` and associated subscription files are hash-recorded but untouched. Seven security/contract defects require one separately authorized complete BLK-003/MVP-08 authoring milestone.
+- **LIMIT:** local source/synthetic/fake-IndexedDB acceptance only; browser/database/production gates and AUTH-02 remain open.
+
+## MVP-02-CLOSE inventory workflow integration - 2026-10-29
+
+- **LOCALLY ACCEPTED:** catalog/snapshot, intake, adjustment, transfer, cached stock/expiry attention, product detail and durable POS non-interference have one integrated fake-IndexedDB/injected-executor workflow: `27 passed`.
+- **CORRECTED:** duplicate/orphan/unsafe snapshot evidence and malformed mutation success rows fail closed before cache replacement or success publication.
+- **PRESERVED:** reviewed inventory presentation, POS/offline and synchronization sources match recorded hashes; the accepted MVP-02B manifest remains `19ca575734b771d4f8600df9b33c6bbb065062f102c5aab45ac299b3f3ad43c5`.
+- **LIMIT:** database/RLS/RPC authority, browser and production acceptance are not complete; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-28-04 MVP-02B rendering-boundary correction - 2026-10-29
+
+- **OWNER AUTHORIZED:** one bounded PharmacyFlow-only correction to the production ProductList runtime input boundary, focused rendering/static/compiler evidence, records and a scoped manifest.
+- **CORRECTED:** null/non-array product collections and malformed rows or directly consumed presentation fields now fail to an explicit unavailable state rather than crashing category extraction, filtering, price formatting or React rendering. Mixed collections keep valid rows visible and label malformed rows separately.
+- **STOCK EVIDENCE:** missing, malformed, duplicate or quantity/band-inconsistent stock rows become unknown for that product. They are never coerced to zero, depleted or adequately stocked; valid products remain in the unfiltered list.
+- **PRESERVED:** the shared branch aggregation, negative deficits, safe-integer rules, display bands, query count/arguments, workspace guards, expiry/POS behavior, storage and protected contracts are unchanged.
+- **EXECUTED LOCAL ONLY:** in-memory production rendering `60 passed`; static wiring/preservation `47 passed`; focused strict and root no-emit compilation passed. The unchanged derivation suite was not rerun.
+- **NOT RUN / LIMIT:** no actual browser/datastore, database/RLS/RPC, Auth/provider, network, credentials, Docker/services/ports or production behavior. Stop for independent review; AUTH-02 remains deferred.
+
+## MVP-02B branch-scoped cached stock attention - 2026-10-28
+
+- **OWNER AUTHORIZED:** one bounded local source/test/document/manifest batch over already-loaded inventory cache evidence only.
+- **IMPLEMENTED:** one immutable production derivation binds user/membership-version/pharmacy/branch workspace identity, validates collections and associations, aggregates safe-integer projected quantities for the current branch, and supplies both the attention panel and ProductList quantities, batch counts, badges and numeric filters.
+- **FAIL CLOSED:** missing groups differ from explicit empty groups; malformed/duplicate/cross-boundary evidence and individual or aggregate overflow become unknown. Unknown products stay visible without numeric filters and are never classified depleted or adequately stocked.
+- **HONEST COVERAGE:** search, product limits, stale metadata, count mismatch and snapshot-generation mismatch are partial; loading/query transitions suppress previous evidence and completed cache errors take precedence. Quantities remain cached/projected; the 1-10 band is not a reorder level, purchase recommendation or available-to-sell guarantee.
+- **PRESERVED:** query count/arguments, synchronization, snapshot/IndexedDB contracts, expiry/status accounting, negative deficits, mutations, POS/FEFO, financial/Auth/permission contracts, migrations and RPCs are unchanged. PF-SUP-2026-10-28-03 manifest was `11/11` before scoped edits and remains historical evidence.
+- **EXECUTED LOCAL ONLY:** derivation `47 passed`; production in-memory rendering `15 passed`; static wiring/hash checks `35 passed`; focused strict and root no-emit compilation passed.
+- **NOT RUN / LIMIT:** no actual browser/IndexedDB/datastore, database/RLS/RPC, Auth/provider, network, authoritative stock or production behavior. Stop for independent review; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-28-02 product-detail publication correction
+
+- **OWNER AUTHORIZED:** one bounded local correction to the existing InventoryView product-detail load lifecycle, focused regressions, records and scoped manifest.
+- **CORRECTED:** one production-used coordinator binds loading, success, unavailable/error and finalization publication to request generation plus current coherent workspace, pharmacy and selected product. Replacement selection, close, workspace change and unmount invalidate pending work; A-to-B-to-A cannot revive the first A request.
+- **FAIL CLOSED:** every returned batch must match the bound pharmacy and product before publication. A current malformed association becomes unavailable; a stale success/failure/finally callback performs no state update. Published coordinator evidence is immutable.
+- **PRESERVED:** accepted strict dates, same-day expiry, FEFO/POS, snapshot/intake, product-detail presentation, durable checkout identities, drafts, transactions, queues and datastore call count/arguments are unchanged.
+- **EXECUTED LOCAL ONLY:** deferred production-orchestration regressions `23 passed`; static wiring/preservation assertions `34 passed`; focused strict and root no-emit compilation passed. The accepted shared-expiry manifest remained `132266438cd43d6f52627bcfcd3616cfa2aa79c93b6b6a1ecc52e29a36821c14` with `17/17` matching before edits.
+- **NOT RUN / LIMIT:** no React browser lifecycle, actual IndexedDB/datastore, database/RLS/RPC, Auth/provider, network or production scheduling was exercised. Stop for independent review; AUTH-02 remains deferred.
+
+## Shared expiry remediation - 2026-10-28
+
+- **OWNER AUTHORIZED:** one bounded local correction implementing the approved exact batch-date and strict reference-date contract across existing inventory/POS consumers.
+- **CORRECTED:** strict Gregorian parsing without normalization; explicit-timezone reference conversion to the actual UTC day; epoch-zero/nullish behavior; snapshot/intake pre-effect rejection; all-candidate FEFO validation; controlled explicit/automatic POS and finalization failure; honest detail unavailable state.
+- **DURABILITY PRESERVED:** invalid evidence creates no sale, transaction or queue operation and does not mutate the cart. The original DRAFT checkout reservation and immutable identities remain intact; no historical record is repaired or removed.
+- **EXECUTED LOCAL ONLY:** focused strict/root compilation PASS; parser/validation/selection `44 passed`; injected production paths `14 passed`; static wiring `21 passed`; existing inventory `71/71`; existing POS `76/76`.
+- **NOT RUN / LIMIT:** no actual browser/IndexedDB, database/RLS/RPC, Auth/provider, network, authoritative-stock or production behavior. Stop for independent review; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-27-07 MVP-02A robustness correction
+
+- **OWNER AUTHORIZED:** one bounded local correction for error/loading precedence and runtime cache-evidence shape validation.
+- **CORRECTED:** completed cache-read failure now wins over the query-mismatch loading flag; retry clears the error before the unchanged cache query and shows genuine loading. Collections, groups, products and batches are runtime-validated before counting, iteration or derivation access; malformed evidence returns `unknown`, never a reassuring empty result.
+- **PRESERVED:** normal complete/partial/empty/success behavior, queries/call counts, shared expiry parser, POS/FEFO, mutations, prices, storage, navigation, drafts, queues and low-stock exclusion.
+- **EXECUTED LOCAL ONLY:** derivation `48 assertions passed`; production-panel in-memory rendering `11 passed`; static wiring `31 passed`; focused strict and root no-emit compilation passed.
+- **NOT RUN / LIMIT:** no browser, IndexedDB, RPC, database/RLS, Auth/provider, network or production behavior was exercised. Independent review is next; AUTH-02 remains deferred.
+
+## MVP-02A branch-scoped inventory expiry attention - 2026-10-27
+
+- **OWNER AUTHORIZED:** one bounded read-only local source/test/document/manifest package using only the cache already loaded by `InventoryView`; the shared POS/batch-selection expiry parser remains unchanged.
+- **IMPLEMENTED:** coherent workspace binding; strict Gregorian/UTC expiry derivation; current-branch and association validation; positive integer cached projected quantities; immutable deterministic rows; preserved server status; explicit time-derived classifications; complete/partial/unknown cache coverage.
+- **STALE CONTAINMENT:** catalog/search publication now requires the current pharmacy and latest request generation. The expiry panel suppresses a prior loaded query during debounce/load and is keyed by user, membership version, pharmacy, branch and role.
+- **PRESERVED:** navigation, price visibility, inventory mutations, POS/FEFO, drafts, queues, synchronization, entitlements, storage and low-stock behavior are unchanged.
+- **EXECUTED LOCAL ONLY:** pure production logic `40 assertions passed`; static wiring `27 passed`; focused strict and root no-emit compilation passed.
+- **OPEN/LIMIT:** `src/lib/inventory/expiry.ts` still normalizes impossible dates and affects POS/batch-selection consumers; it was deliberately not repaired. Browser/IndexedDB/RPC/database/Auth/RLS/network/production behavior is not run. Stop for independent review; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-27-05 MVP-01C validator correction
+
+- **OWNER AUTHORIZED:** one bounded local correction to the existing invitation response validator plus focused tests, records and a new scoped manifest.
+- **CORRECTED:** normalized M-16 email evidence now follows the server constraint without an undocumented dotted-domain rule, including valid `staff@localhost`. Timestamp validation checks real Gregorian month/day and leap-year boundaries, 24-hour time components, numeric offsets and PostgreSQL microsecond precision before accepting a row.
+- **PRESERVED:** secret-bearing and whole-response rejection, exact ten-field allowlisting, immutable results, server status, separately time-derived expiry, RPC invocation, workspace/publication guards, OWNER/MANAGER containment and UI behavior are unchanged.
+- **EXECUTED LOCAL ONLY:** production-validator regression `58 passed`; unchanged-in-scope wiring assertions `35 passed`; focused strict and root no-emit compilation passed.
+- **NOT RUN / LIMIT:** no RPC, PostgreSQL/SQL, Auth/provider/browser, network, credential, service, migration, storage, provisioning or production behavior was exercised. Stop for independent review; AUTH-02 remains deferred.
+
+## MVP-01C read-only staff invitation oversight - 2026-10-27
+
+- **OWNER AUTHORIZED:** one local source/test/document/manifest batch using only the existing `rpc_list_staff_invitations(UUID)` read contract and the coherent workspace pharmacy identifier.
+- **IMPLEMENTED:** exact M-16 ten-field/nullability validation; invitation roles `MANAGER`, `PHARMACIST`, `CASHIER`; all four server statuses; duplicate, cross-pharmacy, unexpected-field and secret-bearing rejection; immutable allowlisted results; sanitized errors; injected-clock expiry display that never rewrites server status.
+- **FAIL-CLOSED LIFECYCLE:** only coherent active OWNER/MANAGER workspaces can mount or load. Identity, membership version, pharmacy, branch and role are rechecked before publication. Refresh, workspace change, sign-out and unmount invalidate pending/current results; the coordinator performs the last freshness check and publication callback synchronously.
+- **PRESERVED:** `StaffInvitationForm`, navigation entitlements, invitation/membership mutations, onboarding, I3, subscription, financial, synchronization, storage and migrations are unchanged.
+- **EXECUTED LOCAL ONLY:** new pure/injected test `41 passed`; new static wiring test `35 passed`; focused strict and root no-emit compilation passed. No accepted PF-SUP-17 or MVP-01B suite was rerun.
+- **NOT RUN / LIMIT:** no actual RPC, PostgreSQL/RLS, Auth/provider/browser, network, credentials, services, storage, migration, provisioning or production behavior was exercised. Independent review is next; AUTH-02 remains deferred.
+
 ## Review-evidence reconciliation and I3A design — 2026-10-26
 
 - **RECONCILED:** owner-supplied transcript attributes PF-SUP-02 as corrected-I2 suitability for bounded I3 authoring, PF-SUP-05 as local I3 boundary/parity pass and PF-SUP-06 as unchanged-hash confirmation plus missing repository export. No omitted review detail is inferred.
@@ -285,5 +525,103 @@ Obtain explicit approval for the cohesive protected Phase B package in `PHARMACY
 - **EXECUTED LOCAL ONLY:** synthetic/injected tests passed, including 16 zero-executor preflight rejections and malformed-stream regressions; static contracts passed; focused strict compilation passed; 8/8 PowerShell sources parsed; recursive sanitizer and process-framing PowerShell tests passed.
 - **NOT RUN:** PostgreSQL parsing/execution, target proof, SQL, fixtures, RPCs, locks, ACL/RLS, Auth/provider/browser, credentials, cleanup, network, Docker, deployment or StoreFlow. AUTH-02 remains deferred and REV-LIN-01 remains undecided. Stop for independent review.
 
+## ACC-01 PF-SUP-2026-10-26-11 two-point runner closure
+
+- **COORDINATOR ACKNOWLEDGMENTS:** every proof-control UPDATE returns one aggregate tag/count scalar. Session releases require exactly one affected row; observation and rollback evidence require exactly two. Zero, wrong, multiple, malformed and wrong-tag results fail closed.
+- **UNSIGNED LOCK COMPONENTS:** session and coordinator SQL share one high/low decomposition using `4294967295` masks. No signed-int narrowing remains. Pure vectors cover positive/negative signed bigint boundaries and unsigned components above signed 32-bit range.
+- **EXECUTED LOCAL ONLY:** synthetic/injected and static tests passed; focused strict compilation passed; 10/10 PowerShell files parsed; PowerShell mutation acknowledgment/lock-source test passed.
+- **NOT RUN:** PostgreSQL parsing, bigint/`pg_locks` parity, SQL, RPCs, mutations, locks, concurrency, fixtures, cleanup or any protected/external operation. Unsupported cases, AUTH-02 and REV-LIN-01 remain unchanged. Stop for independent review.
+
 - Admin read-only data-honesty behavior: **EXECUTED ACCEPTANCE PASS** for the 18-assertion adapter test; auth 40/40 remains **HISTORICAL / REPORTED**. MVP-07 remains partial.
 - Current dirty unified sale/sync work: **EXECUTED DEFECT REPRODUCTION**, 6/6 unsafe observations remain; **BLOCKED — APPROVAL** for implementation. SQL/concurrency effects are **NOT RUN**.
+
+## ACC-01 reservation/revocation concurrency source package — 2026-10-26
+
+- **OWNER-AUTHORIZED LOCAL AUTHORING:** PF-SUP-2026-10-26-12 is the accepted local baseline. The owner authorized only the missing reservation/revocation concurrency scenario, committed-fixture lifecycle, focused local verification, documentation and hashes.
+- **SOURCE BASIS:** the existing reserve and admission-revoke RPCs both acquire `hashtextextended(email_digest, 1)`. Each new case creates its active admission through the production admission RPC before starting concurrent sessions.
+- **TWO ORDERINGS:** reservation-first expects a durable `RESERVED` request followed by admission revocation; revocation-first expects the reservation to fail `PI010` with zero reservation effects. Both require distinct committed backends, the exact production lock blocker/waiter pair, outcome-specific counts, final-state predicates and bounded cancellation/rollback proof.
+- **EXECUTED LOCAL ONLY:** scenario source test passed; synthetic test passed with 16 zero-executor preflight rejections; static contract test passed; focused strict compilation passed; 11/11 PowerShell sources parsed.
+- **NOT RUN:** PostgreSQL parsing/execution, fixtures, RPCs, locks, concurrency, cancellation, cleanup and every protected/external operation. AUTH-02 remains deferred; REV-LIN-01 remains undecided. Stop for independent review.
+
+## REV-LIN-01 policy reconciliation — 2026-10-26
+
+- **OWNER DECISION:** transaction-entry linearization is approved from the PF-SUP-2026-10-26-13 baseline. Admission revocation remains distinct from authority-credential revocation.
+- **ALIGNED SOURCE:** reservation, operator decision/revocation, identity begin and issue/recovery completion SQL call the fail-closed current-authority helpers at transaction entry.
+- **MISMATCHES:** the inactive gateway façade does not reauthorize immediately before delayed provider dispatch or provider recovery; recovery fingerprints/attempt checks bind the recovery actor to original authorship, preventing a different authorized recovery principal and conflating recovery audit identity.
+- **STATUS:** design reconciled only. No application/security source or migration changed; unchanged tests were not rerun. Proposed implementation correction requires separate owner approval. AUTH-02 remains deferred.
+
+## REV-LIN-01 local implementation correction — 2026-10-26
+
+- **OWNER AUTHORIZED:** exact PF-SUP-2026-10-26-14 local source/test/document scope plus one additive, unexecuted migration `000033`.
+- **AUTHORED:** fresh issue/recovery authority at dispatch, resolution, completion and exact-result lookup; scoped cross-principal recovery; immutable original typed-command/credential provenance; separate append-only execution actor audit; fail-closed legacy evidence; explicit old-route closure.
+- **EXECUTED LOCALLY:** strict focused and root compilation passed; gateway injected `50 passed`; operator injected `25 passed`; I3 static contract `135 passed`; scoped whitespace and SHA-256 checks passed.
+- **NOT RUN:** PostgreSQL parsing/execution, migrations, ACL/RLS, triggers, rollback, locks/concurrency, Auth/provider/browser, target/credentials, runtime mapping, provisioning, signup, activation or deployment.
+- **NEXT GATE:** independent review of the scoped correction manifest. AUTH-02 remains deferred and the new authority-scope registry remains unprovisioned.
+
+## PF-SUP-2026-10-26-15 issue-route security correction
+
+- **OWNER AUTHORIZED:** one bounded local source/test/document correction and additive unexecuted migration `000034`; no protected execution.
+- **CORRECTED:** ISSUE dispatch/completion/result lookup now require the immutable original principal at the injected repository and proposed SQL boundaries. Same-principal rotation remains valid; alternate principals must use current scoped RECOVER authority.
+- **SCOPE DEFAULT:** missing, inactive, wrong-capability, wrong-applicant and wrong-context grants deny before repository disclosure/provider access; permitted synthetic identities have explicit grants.
+- **COMPLETION PARITY:** exact completed retry returns the canonical result; changed subject/provider binding conflicts; stale/revoked authority denies; audit failure rolls back completion evidence.
+- **EXECUTED LOCAL ONLY:** focused and root compilation PASS; gateway `64 passed`; operator `25 passed`; static contract `160 passed`; manifest and tracked whitespace checks PASS.
+- **NOT RUN:** SQL/PostgreSQL, migrations, ACL/RLS, rollback, locks/concurrency, Auth/provider/browser, credentials, runtime mapping, provisioning, activation or deployment. Stop for independent review; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-26-16 ACC-01 contract alignment
+
+- **OWNER AUTHORIZED:** source-only harness alignment with preserved migrations `000027`–`000034`; fixture/assertion/cleanup SQL authored but never executed.
+- **ALIGNED:** exact `000033`/`000034` hashes and v4/phase signatures; owned disposable scope fixtures; original-principal, scoped recovery and phase-audit cases; dependency-preserving scope cleanup.
+- **EXECUTED LOCAL ONLY:** synthetic test passed with 16 zero-executor rejections; static source test passed; focused compilation passed; 11 PowerShell files parsed; scenario and runner helper tests passed.
+- **BLOCKED/NOT RUN:** genuine completion replay/audit cases remain AUTH-02 blocked; PostgreSQL parsing/execution, ACL/RLS, transactions, fixtures, cleanup, locks/concurrency, Auth/provider/browser and production behavior were not run. Stop for independent review.
+
+## MVP-01B membership workspace local implementation — 2026-10-27
+
+- **OWNER AUTHORIZED:** local source, isolated tests, static wiring, compilation, records, report and scoped manifest only. Branch choice is session-only and the existing navigation matrix is preserved.
+- **IMPLEMENTED:** branch eligibility is derived from the current active user/membership plus branches returned for the selected pharmacy. One eligible branch auto-selects; multiple require explicit selection; zero is unavailable. A default branch identifier is never accepted unless that branch was returned and associated with the selected pharmacy.
+- **FAIL-CLOSED TRANSITIONS:** resolution clears the previous workspace before asynchronous work. Generation/user guards reject late A→B→A, overlapping refresh, sign-out and previous-user responses. Lookup failure is distinct from a completed no-membership result. `App` validates the complete user/membership/pharmacy/role/branch binding before mounting `OfflineSyncRuntime` or operational views.
+- **PRESERVATION:** no branch storage, privileged mutation, queue/draft cleanup, adapter, migration, onboarding, invitation, I3, subscription, financial or synchronization contract change was added. Existing pharmacy storage remains a revalidated convenience hint.
+- **EXECUTED LOCAL ONLY:** membership policy/transition test `27 passed`; static wiring test `22 passed`; focused no-emit compilation passed after the focused config was corrected to include existing Node ambient types; root no-emit compilation passed. No unchanged PF-SUP-17 suite was rerun.
+- **NOT RUN / LIMIT:** React/browser rendering, Supabase Auth, RLS/database eligibility, network, persistence/queued-draft behavior, and production concurrency were not executed. Source alignment is not protected-contract acceptance. Independent review is next; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-27-03 MVP-01B publication-boundary correction
+
+- **OWNER AUTHORIZED:** one bounded local coordination/AuthContext/test/document correction. The accepted session coordinator, branch policy, navigation, storage behavior and protected contracts remain unchanged.
+- **CORRECTED:** every awaited caller rechecks generation/current-user freshness before a subsequent query. `waitForCurrent` also rejects already-superseded work before invoking its loader.
+- **ATOMIC LOCAL PUBLICATION:** `publishIfCurrent` validates freshness and runs the complete synchronous publication callback in one turn. Ready, explicit branch selection, no eligible branches, confirmed no membership, pharmacy selection and error paths use this boundary; the existing pharmacy-hint write is inside the guarded activation callback with no await.
+- **MICROTASK REGRESSION:** deterministic tests invalidate after the helper's internal current check but before the caller resumes. Sign-out, newer selection, refresh and identity change each produce zero stale workspace, state or preference publication. A second query is not started after invalidation; normal publication for all four outcomes remains valid.
+- **EXECUTED LOCAL ONLY:** publication-boundary `22 passed`; session-transition `20 passed`; membership policy `27 passed`; static wiring `40 passed`; focused and root no-emit compilation passed. No PF-SUP-17 suite was rerun.
+- **NOT RUN / LIMIT:** actual Auth/provider/browser scheduling, React rendering, database/RLS, network, storage/draft behavior and production execution remain unverified. Independent review is next; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-27-02 MVP-01B session-transition correction
+
+- **OWNER AUTHORIZED:** one bounded local correction to prevent superseded sign-in/initial-session responses from publishing identity or starting workspace resolution. No Auth-provider contract, adapter, storage, migration or protected execution change was authorized.
+- **CORRECTED:** `AuthSessionTransitionCoordinator` decides attempt/session freshness before any React identity assignment. Workspace invalidation precedes identity publication or clearing, and resolution begins only after coordinated adoption. Provider Auth events invalidate pending responses; matching event-first sign-in results become no-ops rather than duplicate publications.
+- **DEFERRED ORCHESTRATION:** the production workspace guard now gates awaited query continuations. Synthetic deferred responses cover sign-in-after-sign-out, older-after-newer sign-in, late initial session, refresh/selection overlap, both legitimate Auth-event/sign-in orderings, current failure and cancellation.
+- **PRESERVED:** branch eligibility, session-only branch choice, navigation entitlements, pharmacy preference behavior, drafts, queues, history, onboarding, invitations, I3, financial and synchronization contracts are unchanged.
+- **EXECUTED LOCAL ONLY:** session-transition test `20 passed`; unchanged membership policy test `27 passed`; static wiring test `32 passed`; focused and root no-emit compilation passed. The first combined check stopped on one obsolete static assertion for the prior direct sign-out guard; it was updated to assert coordinator cancellation before provider sign-out, and the final static run passed. PF-SUP-17 suites were not rerun.
+- **NOT RUN / LIMIT:** actual Supabase Auth timing, React/browser rendering, RLS/database, network, storage/draft behavior and production execution remain unverified. Independent review is next; AUTH-02 remains deferred.
+
+## PF-SUP-2026-10-26-17 ACC-01 assertion closure
+
+- **OWNER AUTHORIZED:** one source-only harness/test/document correction; no migration or protected execution.
+- **CLOSED LOCALLY:** exact retired v2 signatures join the nine-signature closed ACL matrix; migration-to-matrix static equality prevents future omission.
+- **FAIL-CLOSED RESPONSES:** pending identity responses require typed, present, exact state, original identity/version and provider-operation bindings. SQL/JSON null, absence, type and value negatives are authored; present JSON-null pending result remains valid.
+- **LOCAL EVIDENCE:** synthetic test rejected 26 malformed responses and retained 16 zero-executor preflight rejections; static source test covered nine retired signatures; focused compilation passed. PostgreSQL remains not run and AUTH-02 remains deferred.
+
+## PF-MVP-08 foundation security closure — PF-SUP-2026-10-29-03
+
+- Request-bound entitlement parsing, sanitized bounded injected RPC failure, exact committed replay evidence and deterministic administrative decision helpers are locally implemented and regression-covered.
+- Additive migration `000036` is an unexecuted private foundation proposal only; no business route is wired.
+- Status: **LOCALLY CORRECTED — INDEPENDENT REVIEW REQUIRED — POSTGRESQL/CONCURRENCY NOT RUN**. Accepted inventory hashes remain preserved; AUTH-02 remains deferred.
+
+## PF-MVP-08 foundation acceptance completion — PF-SUP-2026-10-29-04
+
+- Reconciled `000035` provenance without editing it: inventory snapshot `5de903...`; documented authorized foundation lineage and current bytes `46a285...`; transient untracked `8a43...` state observed but not attributable from Git.
+- Final replay consumption is fully request-bound; administrative ordering preserves PostgreSQL microseconds; v2 effective evaluation and trusted producer contracts are authored in additive unexecuted `000037`.
+- Local evidence: `15`, `9`, `49`, `1004`, `61`, `11` and `25` assertions passed; focused/root compilation passed. Business wiring and all protected execution remain unperformed.
+
+## PF-SUP-2026-10-30-01 entitlement wiring parity/readiness correction
+
+- PF-MVP-09/R/S is quarantined: its report cites proposed authorization, and its migration has four lexical structure failures plus demonstrated M-18, Refund V2, intake, transfer and grant-parity defects.
+- The authoritative runnable migration lineage stops at `000036`; the later clean foundation proposal is blocked behind malformed competing `20261029000037`.
+- Contract-parity regression: `79 passed; quarantined structure errors: 4`. PostgreSQL parsing/application and disposable readiness are NOT ESTABLISHED. Existing migration bytes and historical manifests remain preserved.

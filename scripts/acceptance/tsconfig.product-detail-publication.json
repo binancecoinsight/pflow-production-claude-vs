@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "../../src/lib/inventory/productDetailLoad.ts",
+    "../../src/lib/inventory/productDetailLoad.test.ts",
+    "../../src/components/inventory/InventoryView.tsx"
+  ]
+}

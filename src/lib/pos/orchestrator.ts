@@ -18,6 +18,7 @@ import {
   getProductById,
   getBatchesForProduct,
   computeExpiryInfo,
+  InvalidInventoryDateError,
   getInventorySnapshotMetadata,
   isSnapshotStale
 } from '../inventory/index';
@@ -169,7 +170,16 @@ export const finalizePosSale = async (
     }
 
     // Verify batch is not expired
-    const expiry = computeExpiryInfo(matchedBatch.expiry_date);
+    let expiry;
+    try {
+      expiry = computeExpiryInfo(matchedBatch.expiry_date);
+    } catch (error: unknown) {
+      if (error instanceof InvalidInventoryDateError) {
+        errors.push(`${prefix}: Batch expiry evidence is invalid; sale finalization is blocked`);
+        continue;
+      }
+      throw error;
+    }
     if (expiry.is_expired) {
       errors.push(`${prefix}: Batch ${matchedBatch.batch_number} has expired (${matchedBatch.expiry_date})`);
     }

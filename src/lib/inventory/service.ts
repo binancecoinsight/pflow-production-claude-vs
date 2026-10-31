@@ -45,13 +45,62 @@ import {
   validateStockTransferDispatchRequest,
   validateStockTransferReceiveRequest
 } from './validation';
-import { computeExpiryInfo, parseUtcMidnight } from './expiry';
+import { computeExpiryInfo, parseExpiryDateUtcMidnight, parseUtcMidnight } from './expiry';
 import { openOfflineDb, STORES } from '../offline/db';
 import { SaleLineItemInput } from '../sales/types';
 import { supabase } from '../supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { isOnline } from '../offline/network';
 import { refreshInventorySnapshot } from './sync';
+
+const isRpcRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isSafeInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value);
+
+const isNonNegativeSafeInteger = (value: unknown): value is number =>
+  isSafeInteger(value) && value >= 0;
+
+const RPC_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(?:Z|([+-])(\d{2}):(\d{2}))$/;
+
+const isValidRpcTimestamp = (value: unknown): value is string =>
+  typeof value === 'string' && (() => {
+    const match = RPC_TIMESTAMP_PATTERN.exec(value);
+    if (!match) return false;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]);
+    const offsetHour = match[8] ? Number(match[9]) : 0;
+    const offsetMinute = match[8] ? Number(match[10]) : 0;
+    if (year < 1 || month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59
+        || offsetHour > 23 || offsetMinute > 59) return false;
+    const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return day >= 1 && day <= daysInMonth[month - 1];
+  })();
+
+const isValidRpcUuid = (value: unknown): value is string =>
+  typeof value === 'string' && isValidUuid(value);
+
+const singleRpcRow = (data: unknown): unknown => {
+  if (!Array.isArray(data)) return data;
+  return data.length === 1 ? data[0] : null;
+};
+
+const expectedIntakeTotal = (items: ReadonlyArray<{ quantity: number; cost_price: number }>): number | null => {
+  let total = 0;
+  for (const item of items) {
+    const itemTotal = item.quantity * item.cost_price;
+    if (!Number.isSafeInteger(itemTotal)) return null;
+    total += itemTotal;
+    if (!Number.isSafeInteger(total)) return null;
+  }
+  return total;
+};
 
 /**
  * Atomically replaces the local catalog snapshot for a specific pharmacy in IndexedDB.
@@ -420,7 +469,8 @@ export const getEligibleBatchesForProduct = async (
   customFactory?: IDBFactory
 ): Promise<Array<LocalBatch & { expiry: BatchExpiryInfo }>> => {
   const batches = await getBatchesForProduct(pharmacyId, productId, options?.branchId, customFactory);
-  const refDate = options?.referenceDate || new Date();
+  const refDate = options?.referenceDate ?? new Date();
+  parseUtcMidnight(refDate);
 
   const evaluated = batches.map((b) => ({
     ...b,
@@ -441,8 +491,8 @@ export const getEligibleBatchesForProduct = async (
     if (a.expiry.is_expired !== b.expiry.is_expired) {
       return a.expiry.is_expired ? 1 : -1;
     }
-    const aUtc = parseUtcMidnight(a.expiry_date);
-    const bUtc = parseUtcMidnight(b.expiry_date);
+    const aUtc = parseExpiryDateUtcMidnight(a.expiry_date);
+    const bUtc = parseExpiryDateUtcMidnight(b.expiry_date);
     if (aUtc !== bUtc) return aUtc - bUtc;
 
     if (a.projected_stock !== b.projected_stock) {
@@ -466,9 +516,9 @@ export const selectRecommendedBatch = (
   batches: LocalBatch[],
   options?: BatchSelectionOptions
 ): LocalBatch | null => {
+  const refDate = options?.referenceDate ?? new Date();
+  parseUtcMidnight(refDate);
   if (!batches || batches.length === 0) return null;
-
-  const refDate = options?.referenceDate || new Date();
   const evaluated = batches.map((b) => ({
     ...b,
     expiry: computeExpiryInfo(b.expiry_date, refDate)
@@ -485,8 +535,8 @@ export const selectRecommendedBatch = (
     if (a.expiry.is_expired !== b.expiry.is_expired) {
       return a.expiry.is_expired ? 1 : -1;
     }
-    const aUtc = parseUtcMidnight(a.expiry_date);
-    const bUtc = parseUtcMidnight(b.expiry_date);
+    const aUtc = parseExpiryDateUtcMidnight(a.expiry_date);
+    const bUtc = parseExpiryDateUtcMidnight(b.expiry_date);
     if (aUtc !== bUtc) return aUtc - bUtc;
 
     if (a.projected_stock !== b.projected_stock) {
@@ -654,6 +704,7 @@ export const submitStockIntake = async (
       else if (error.message?.includes('INVALID_QUANTITY')) errorCode = 'INVALID_QUANTITY';
       else if (error.message?.includes('INVALID_BATCH_NUMBER')) errorCode = 'INVALID_BATCH_NUMBER';
       else if (error.message?.includes('INVALID_EXPIRY')) errorCode = 'INVALID_EXPIRY';
+      else if (error.message?.includes('IDEMPOTENCY_CONFLICT')) errorCode = 'IDEMPOTENCY_CONFLICT';
 
       return {
         success: false,
@@ -662,8 +713,15 @@ export const submitStockIntake = async (
       };
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row || !row.purchase_id) {
+    const row = singleRpcRow(data);
+    const calculatedTotal = expectedIntakeTotal(formattedItems);
+    if (!isRpcRecord(row)
+        || !isValidRpcUuid(row.purchase_id)
+        || row.status !== 'COMPLETED'
+        || !isNonNegativeSafeInteger(row.total_items) || row.total_items !== formattedItems.length
+        || calculatedTotal === null
+        || !isNonNegativeSafeInteger(row.total_cost) || row.total_cost !== calculatedTotal
+        || !isValidRpcTimestamp(row.processed_at)) {
       return {
         success: false,
         error: 'Stock intake RPC returned unexpected response format',
@@ -686,10 +744,10 @@ export const submitStockIntake = async (
     return {
       success: true,
       purchase_id: row.purchase_id,
-      status: row.status || 'COMPLETED',
-      total_items: Number(row.total_items) || formattedItems.length,
-      total_cost: Number(row.total_cost) || 0,
-      processed_at: row.processed_at || new Date().toISOString()
+      status: row.status,
+      total_items: row.total_items,
+      total_cost: row.total_cost,
+      processed_at: row.processed_at
     };
   } catch (err: any) {
     return {
@@ -773,8 +831,17 @@ export const adjustInventoryStock = async (
       };
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row || !row.adjustment_id) {
+    const row = singleRpcRow(data);
+    const expectedDelta = request.direction === 'INCREASE' ? request.quantity : -request.quantity;
+    if (!isRpcRecord(row)
+        || !isValidRpcUuid(row.adjustment_id)
+        || !isValidRpcUuid(row.batch_id) || row.batch_id.toLowerCase().trim() !== request.batch_id.toLowerCase().trim()
+        || !isSafeInteger(row.previous_quantity)
+        || !isSafeInteger(row.adjustment_quantity) || row.adjustment_quantity !== expectedDelta
+        || !isSafeInteger(row.resulting_quantity)
+        || !Number.isSafeInteger(row.previous_quantity + row.adjustment_quantity)
+        || row.resulting_quantity !== row.previous_quantity + row.adjustment_quantity
+        || !isValidRpcTimestamp(row.adjusted_at)) {
       return {
         success: false,
         error: 'Stock adjustment RPC returned unexpected response format',
@@ -798,10 +865,10 @@ export const adjustInventoryStock = async (
       success: true,
       adjustment_id: row.adjustment_id,
       batch_id: row.batch_id,
-      previous_quantity: Number(row.previous_quantity),
-      adjustment_quantity: Number(row.adjustment_quantity),
-      resulting_quantity: Number(row.resulting_quantity),
-      adjusted_at: row.adjusted_at || new Date().toISOString()
+      previous_quantity: row.previous_quantity,
+      adjustment_quantity: row.adjustment_quantity,
+      resulting_quantity: row.resulting_quantity,
+      adjusted_at: row.adjusted_at
     };
   } catch (err: any) {
     return {
@@ -892,8 +959,12 @@ export const dispatchStockTransfer = async (
       };
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row || !row.transfer_id) {
+    const row = singleRpcRow(data);
+    if (!isRpcRecord(row)
+        || !isValidRpcUuid(row.transfer_id)
+        || (row.status !== 'DISPATCHED' && row.status !== 'RECEIVED')
+        || !isNonNegativeSafeInteger(row.total_items) || row.total_items !== formattedItems.length
+        || !isValidRpcTimestamp(row.dispatched_at)) {
       return {
         success: false,
         error: 'Stock transfer dispatch RPC returned unexpected response format',
@@ -916,9 +987,9 @@ export const dispatchStockTransfer = async (
     return {
       success: true,
       transfer_id: row.transfer_id,
-      status: row.status || 'DISPATCHED',
-      total_items: Number(row.total_items) || formattedItems.length,
-      dispatched_at: row.dispatched_at || new Date().toISOString()
+      status: row.status,
+      total_items: row.total_items,
+      dispatched_at: row.dispatched_at
     };
   } catch (err: any) {
     return {
@@ -996,8 +1067,13 @@ export const receiveStockTransfer = async (
       };
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row || !row.transfer_id) {
+    const row = singleRpcRow(data);
+    if (!isRpcRecord(row)
+        || !isValidRpcUuid(row.transfer_id)
+        || row.transfer_id.toLowerCase().trim() !== request.transfer_id.toLowerCase().trim()
+        || row.status !== 'RECEIVED'
+        || !isSafeInteger(row.total_items) || row.total_items < 1
+        || !isValidRpcTimestamp(row.received_at)) {
       return {
         success: false,
         error: 'Stock transfer receive RPC returned unexpected response format',
@@ -1020,9 +1096,9 @@ export const receiveStockTransfer = async (
     return {
       success: true,
       transfer_id: row.transfer_id,
-      status: row.status || 'RECEIVED',
-      total_items: Number(row.total_items) || 0,
-      received_at: row.received_at || new Date().toISOString()
+      status: row.status,
+      total_items: row.total_items,
+      received_at: row.received_at
     };
   } catch (err: any) {
     return {
@@ -1517,4 +1593,3 @@ export const setProductStatus = async (
 ): Promise<CatalogMutationResult> => {
   return updateCatalogProduct(client, pharmacyId, productId, { status }, customFactory);
 };
-

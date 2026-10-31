@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "../../src/lib/auth/membershipWorkspace.ts",
+    "../../src/lib/auth/membershipWorkspace.test.ts",
+    "../../src/lib/auth/publicationBoundary.test.ts",
+    "../../src/lib/auth/sessionTransition.ts",
+    "../../src/lib/auth/sessionTransition.test.ts",
+    "../../src/types/auth.ts",
+    "../../src/contexts/AuthContext.tsx",
+    "../../src/components/BranchSelectionScreen.tsx",
+    "../../src/components/AuthenticatedShell.tsx",
+    "../../src/components/NoMembershipScreen.tsx",
+    "../../src/App.tsx"
+  ]
+}

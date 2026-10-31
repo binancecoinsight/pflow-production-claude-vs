@@ -19,8 +19,18 @@ export interface VerifiedPrincipal {
   credentialVersion: number;
 }
 
+export interface GatewayAuthorizationScope {
+  applicantKey: string;
+  pharmacyContextId: string;
+}
+
 export interface GatewayAuthority {
   requireGateway(credential: PresentedCredential, capability: GatewayCapability): Promise<VerifiedPrincipal>;
+  requireGatewayForContext(
+    credential: PresentedCredential,
+    capability: GatewayCapability,
+    scope: GatewayAuthorizationScope,
+  ): Promise<VerifiedPrincipal>;
 }
 
 export interface OperatorAuthority {

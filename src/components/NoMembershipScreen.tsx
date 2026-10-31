@@ -39,8 +39,9 @@ export const NoMembershipScreen: React.FC = () => {
 
         <h2 className="text-xl font-bold text-white mb-2">No Active Pharmacy Membership</h2>
         <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-          Authenticated as <strong className="text-slate-200">{profile?.full_name || user?.email}</strong>. 
-          Your account is valid, but you have not yet been assigned to an active pharmacy roster in the database.
+          Authenticated as <strong className="text-slate-200">{profile?.full_name || user?.email}</strong>.
+          The completed membership lookup returned no active pharmacy roster entry for this identity.
+          This result does not distinguish a never-assigned account from a suspended or revoked membership.
         </p>
 
         <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-left text-xs space-y-2 mb-6 text-slate-400">
@@ -49,7 +50,7 @@ export const NoMembershipScreen: React.FC = () => {
             <span>Database Access Restricted</span>
           </div>
           <p>
-            Under PharmacyFlow&apos;s Row Level Security architecture, users cannot access operational data without an authoritative record in <code className="text-emerald-400">pharmacy_members</code>.
+            Operational content remains unmounted without a currently returned active record in <code className="text-emerald-400">pharmacy_members</code>. Lookup failures are shown separately and are never reported as confirmed membership loss.
           </p>
           <p>
             Please ask your pharmacy Owner or Manager to invite your email address.

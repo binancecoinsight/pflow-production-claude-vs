@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  Building2, 
-  MapPin, 
-  ShieldCheck, 
-  LogOut, 
-  CheckCircle, 
-  Clock, 
+import {
+  Building2,
+  MapPin,
+  ShieldCheck,
+  LogOut,
+  CheckCircle,
+  Clock,
   AlertTriangle,
   User as UserIcon,
   CreditCard,
@@ -32,21 +32,25 @@ import { ReportsView } from './reports/ReportsView';
 import { DeviceManagementView } from './devices/DeviceManagementView';
 import { resolveSubscriptionLifecycle } from '../lib/subscription/lifecycle';
 import { StaffInvitationForm } from './StaffInvitationForm';
-
-type WorkspaceTab = 'pos' | 'inventory' | 'sales' | 'customers' | 'suppliers' | 'reconciliation' | 'reports' | 'devices' | 'overview';
+import { WorkspaceTab, canViewWorkspaceTab } from '../lib/auth/membershipWorkspace';
+import { StaffInvitationOversightPanel } from './StaffInvitationOversightPanel';
+import { deriveStaffInvitationWorkspace } from '../lib/auth/staffInvitationOversight';
 
 export const AuthenticatedShell: React.FC = () => {
-  const { 
-    user, 
-    profile, 
+  const {
+    user,
+    profile,
     memberships,
-    pharmacy, 
-    branch, 
-    role, 
-    permissions, 
-    subscription, 
-    selectPharmacy, 
-    signOut 
+    membership,
+    pharmacy,
+    branches,
+    branch,
+    role,
+    permissions,
+    subscription,
+    selectPharmacy,
+    requestBranchSelection,
+    signOut
   } = useAuth();
 
   const [switcherOpen, setSwitcherOpen] = useState<boolean>(false);
@@ -54,7 +58,14 @@ export const AuthenticatedShell: React.FC = () => {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('pos');
   const subscriptionLifecycle = resolveSubscriptionLifecycle(subscription);
 
-  const canViewReports = role === 'OWNER' || role === 'MANAGER' || role === 'PHARMACIST' || permissions.includes('reports.read');
+  const canViewReports = canViewWorkspaceTab('reports', role, permissions);
+  const canViewStaffInvitationOversight = Boolean(deriveStaffInvitationWorkspace({
+    userId: user?.id ?? null,
+    membership,
+    pharmacy,
+    branch,
+    role,
+  }));
 
   const getRoleBadgeColor = (r: string | null) => {
     switch (r) {
@@ -153,6 +164,15 @@ export const AuthenticatedShell: React.FC = () => {
                 <span>{branch.name}</span>
                 {branch.is_main && (
                   <span className="text-[10px] px-1 rounded bg-slate-800 text-slate-400">Main</span>
+                )}
+                {branches.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={requestBranchSelection}
+                    className="ml-1 rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-emerald-400 hover:border-emerald-500/40"
+                  >
+                    Change branch
+                  </button>
                 )}
               </div>
             )}
@@ -346,7 +366,7 @@ export const AuthenticatedShell: React.FC = () => {
                   Welcome, {profile?.full_name || user?.email}
                 </h1>
                 <p className="text-sm text-slate-400 mt-1 max-w-xl">
-                  Currently operating workspace <strong className="text-white">{pharmacy?.name}</strong>. 
+                  Currently operating workspace <strong className="text-white">{pharmacy?.name}</strong>.
                   Governed strictly by PostgreSQL Row Level Security policies M-1 through M-7.
                 </p>
               </div>
@@ -443,6 +463,8 @@ export const AuthenticatedShell: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {canViewStaffInvitationOversight && <StaffInvitationOversightPanel />}
 
             {/* Resolved Permissions Card */}
             <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 mb-8">

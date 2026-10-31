@@ -41,7 +41,7 @@ try {
       [int]$identity.server_port -ne 57322 -or [string]$identity.system_identifier -cne [string]$authorization.target.systemIdentifier -or
       [int]$identity.database_oid -ne [int]$authorization.target.databaseOid -or $identity.session_user -cne 'postgres') { throw 'target identity proof mismatch before fixture/schema access' }
   $files = if($Command -ceq 'postgres-fixture'){ @('sql\10_fixture.sql') }
-    elseif($Command -ceq 'postgres-assertions'){ @('sql\20_acl_rls_assertions.sql','sql\21_role_dml_denial.sql','sql\22_authority_assertions.sql','sql\23_operation_recovery_assertions.sql','sql\24_atomic_replay_assertions.sql','sql\25_lifecycle_recovery_assertions.sql') }
+    elseif($Command -ceq 'postgres-assertions'){ @('sql\20_acl_rls_assertions.sql','sql\21_role_dml_denial.sql','sql\22_authority_assertions.sql','sql\23_operation_recovery_assertions.sql','sql\24_atomic_replay_assertions.sql','sql\25_lifecycle_recovery_assertions.sql','sql\26_identity_phase_assertions.sql') }
     else { @('sql\90_cleanup.sql') }
   $results=@(); foreach($relative in $files){ $result=Invoke-I3aPsql (Join-Path $PSScriptRoot $relative); $kind=[IO.Path]::GetFileNameWithoutExtension($relative); $parsed=ConvertFrom-I3aProcessOutput $result.ExitCode $result.Stdout $result.Stderr $kind; $results += [pscustomobject]@{File=$relative;Payload=$parsed.Envelope.payload;Diagnostics=$parsed.Diagnostics} }
   Write-I3aEvidence $authorization.evidenceRoot $authorization.runId $Command 'EXECUTED_UNREVIEWED' $results

@@ -6,6 +6,7 @@
  */
 
 import { LocalProduct, LocalBatch, InventorySnapshot } from './types';
+import { parseExpiryDateUtcMidnight } from './expiry';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -37,12 +38,12 @@ export const validateProductRecord = (
   }
 
   const sellingPrice = raw.selling_price !== undefined ? raw.selling_price : 0;
-  if (typeof sellingPrice !== 'number' || !Number.isInteger(sellingPrice) || sellingPrice < 0) {
+  if (typeof sellingPrice !== 'number' || !Number.isSafeInteger(sellingPrice) || sellingPrice < 0) {
     return { isValid: false, error: `Product ${raw.id} selling_price must be a non-negative integer minor unit` };
   }
 
   const costPrice = raw.cost_price !== undefined ? raw.cost_price : 0;
-  if (typeof costPrice !== 'number' || !Number.isInteger(costPrice) || costPrice < 0) {
+  if (typeof costPrice !== 'number' || !Number.isSafeInteger(costPrice) || costPrice < 0) {
     return { isValid: false, error: `Product ${raw.id} cost_price must be a non-negative integer minor unit` };
   }
 
@@ -95,22 +96,27 @@ export const validateBatchRecord = (
     return { isValid: false, error: `Batch ${raw.id} must have a non-empty batch_number` };
   }
 
-  if (typeof raw.expiry_date !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(raw.expiry_date.trim())) {
+  if (typeof raw.expiry_date !== 'string') {
     return { isValid: false, error: `Batch ${raw.id} has invalid expiry_date: ${raw.expiry_date}` };
+  }
+  try {
+    parseExpiryDateUtcMidnight(raw.expiry_date);
+  } catch {
+    return { isValid: false, error: `Batch ${raw.id} has invalid expiry_date: exact Gregorian YYYY-MM-DD required` };
   }
 
   const quantity = raw.quantity !== undefined ? raw.quantity : 0;
-  if (typeof quantity !== 'number' || !Number.isInteger(quantity) || !Number.isFinite(quantity)) {
-    return { isValid: false, error: `Batch ${raw.id} quantity must be a finite integer` };
+  if (typeof quantity !== 'number' || !Number.isSafeInteger(quantity)) {
+    return { isValid: false, error: `Batch ${raw.id} quantity must be a safe integer` };
   }
 
   const sellingPrice = raw.selling_price !== undefined ? raw.selling_price : 0;
-  if (typeof sellingPrice !== 'number' || !Number.isInteger(sellingPrice) || sellingPrice < 0) {
+  if (typeof sellingPrice !== 'number' || !Number.isSafeInteger(sellingPrice) || sellingPrice < 0) {
     return { isValid: false, error: `Batch ${raw.id} selling_price must be a non-negative integer minor unit` };
   }
 
   const costPrice = raw.cost_price !== undefined ? raw.cost_price : 0;
-  if (typeof costPrice !== 'number' || !Number.isInteger(costPrice) || costPrice < 0) {
+  if (typeof costPrice !== 'number' || !Number.isSafeInteger(costPrice) || costPrice < 0) {
     return { isValid: false, error: `Batch ${raw.id} cost_price must be a non-negative integer minor unit` };
   }
 
@@ -120,7 +126,7 @@ export const validateBatchRecord = (
     product_id: raw.product_id.toLowerCase().trim(),
     branch_id: raw.branch_id.toLowerCase().trim(),
     batch_number: raw.batch_number.trim(),
-    expiry_date: raw.expiry_date.trim().substring(0, 10),
+    expiry_date: raw.expiry_date,
     projected_stock: quantity,
     selling_price: sellingPrice,
     cost_price: costPrice,
@@ -181,6 +187,21 @@ export const validateSnapshot = (
     }
   }
 
+  const productIds = new Set<string>();
+  for (const product of validatedProducts) {
+    if (productIds.has(product.id)) errors.push(`Duplicate product id: ${product.id}`);
+    productIds.add(product.id);
+  }
+
+  const batchIds = new Set<string>();
+  for (const batch of validatedBatches) {
+    if (batchIds.has(batch.id)) errors.push(`Duplicate batch id: ${batch.id}`);
+    batchIds.add(batch.id);
+    if (!productIds.has(batch.product_id)) {
+      errors.push(`Batch ${batch.id} references product ${batch.product_id} outside the snapshot`);
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -211,13 +232,13 @@ export const validateStockIntakeItem = (
     return { isValid: false, error: 'Batch number is required and cannot be empty' };
   }
 
-  if (typeof item.expiry_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.expiry_date.trim())) {
+  if (typeof item.expiry_date !== 'string') {
     return { isValid: false, error: 'Expiry date must be in YYYY-MM-DD format' };
   }
-
-  const d = new Date(item.expiry_date.trim());
-  if (isNaN(d.getTime())) {
-    return { isValid: false, error: 'Invalid expiry date' };
+  try {
+    parseExpiryDateUtcMidnight(item.expiry_date);
+  } catch {
+    return { isValid: false, error: 'Expiry date must be an exact valid Gregorian YYYY-MM-DD value' };
   }
 
   const costPrice = item.cost_price !== undefined ? item.cost_price : 0;
@@ -451,4 +472,3 @@ export const validateStockTransferReceiveRequest = (
     errors
   };
 };
-

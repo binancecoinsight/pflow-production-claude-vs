@@ -286,3 +286,11 @@ Executed only read-only/local hashing and document inspection. PF-SUP-04 verifie
 I3A design is complete only as a proposal. Stop for independent review of the new manifest. Provider feasibility and every protected execution gate remain open. AUTH-02 remains deferred.
 
 No StoreFlow resource, database, migration, Auth/provider/network, Docker/service/port, credential, browser storage, installation, Git mutation, provisioning, signup, activation or deployment operation was accessed or performed. Dirty/untracked work, historical manifests, sealed migrations and protected financial/Refund V2/onboarding contracts were preserved.
+
+## 13. Superseding REV-LIN-01 policy disposition — PF-SUP-2026-10-26-13 baseline
+
+The owner subsequently selected **transaction-entry linearization**. The earlier `REV-LIN-01 undecided` statements above remain historical; they are superseded prospectively by the owner policy recorded in `PHARMACYFLOW_BLK002_REV_LIN_01_POLICY_RECONCILIATION_2026-10-26.md`.
+
+Every independently invoked gateway/operator/database/provider-dispatch/completion/recovery phase must validate current trusted identity, active state, credential version and exact action permission at its own authoritative entry. Acceptance permits only that bounded phase to finish; a durable attempt is not continuing authority. Already-dispatched provider effects retain exact operation correlation and are never blindly recreated. A different currently authorized recovery principal may resolve the immutable original operation, with recovery authorship audited separately.
+
+Source inspection found the SQL authority checks at reservation, operator, begin, completion and recovery RPC entries, but also found missing fresh façade checks before provider dispatch/resolution and recovery SQL that binds the recovery actor as the original principal. Therefore the policy is approved but not fully enforced or database verified. Implementation requires a separately authorized façade/test/forward-migration correction; AUTH-02 remains deferred.

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { AuthContextValue, SessionState, MembershipWithPharmacy } from '../types/auth';
@@ -11,6 +11,18 @@ import {
   DEFAULT_OWNER_ONBOARDING_DEPLOYMENT,
   readOwnerOnboardingIntent,
 } from '../lib/auth/onboarding';
+import {
+  WorkspaceRequestGuard,
+  WorkspaceRequestToken,
+  isMembershipSelectionCurrent,
+  resolveEligibleBranches,
+  selectEligibleBranch,
+  selectMembershipForPharmacy,
+} from '../lib/auth/membershipWorkspace';
+import {
+  AuthSessionTransitionCoordinator,
+  SessionTransitionEffects,
+} from '../lib/auth/sessionTransition';
 
 const LAST_PHARMACY_KEY = 'pharmacyflow.selected_pharmacy_id';
 
@@ -23,150 +35,199 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [memberships, setMemberships] = useState<MembershipWithPharmacy[]>([]);
   const [membership, setMembership] = useState<PharmacyMember | null>(null);
   const [pharmacy, setPharmacy] = useState<Pharmacy | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const requestGuardRef = useRef(new WorkspaceRequestGuard());
+  const sessionCoordinatorRef = useRef(new AuthSessionTransitionCoordinator<User>());
+  const currentUserIdRef = useRef<string | null>(null);
+  const pendingBranchTokenRef = useRef<WorkspaceRequestToken | null>(null);
+
+  const clearResolvedWorkspace = useCallback((nextState: SessionState) => {
+    pendingBranchTokenRef.current = null;
+    setProfile(null);
+    setMemberships([]);
+    setMembership(null);
+    setPharmacy(null);
+    setBranches([]);
+    setBranch(null);
+    setRole(null);
+    setPermissions([]);
+    setSubscription(null);
+    setError(null);
+    setState(nextState);
+  }, []);
+
+  const publishResolutionError = useCallback((request: WorkspaceRequestToken, message: string) => {
+    requestGuardRef.current.publishIfCurrent(request, () => currentUserIdRef.current, () => {
+      clearResolvedWorkspace('authenticated_error');
+      setError(message);
+    });
+  }, [clearResolvedWorkspace]);
 
   /**
    * Activates a specific verified membership, resolving branch, permissions, and subscription.
    */
-  const activateMembership = useCallback(async (selectedMember: MembershipWithPharmacy) => {
+  const activateMembership = useCallback(async (
+    authUser: User,
+    selectedMember: MembershipWithPharmacy,
+    resolvedMemberships: MembershipWithPharmacy[],
+    resolvedProfile: UserProfile | null,
+    request: WorkspaceRequestToken,
+  ) => {
     try {
-      setMembership(selectedMember);
+      if (!requestGuardRef.current.isCurrent(request, currentUserIdRef.current)) return;
+      const selectedPharmacy = selectedMember.pharmacy;
+      if (!selectedPharmacy
+          || !isMembershipSelectionCurrent(resolvedMemberships, authUser.id, selectedMember)) {
+        throw new Error('Selected pharmacy is not backed by a current active membership.');
+      }
+
       const userRole = selectedMember.role;
-      setRole(userRole);
-      setPharmacy(selectedMember.pharmacy || null);
+      if (!requestGuardRef.current.isCurrent(request, currentUserIdRef.current)) return;
+      const activationResult = await requestGuardRef.current.waitForCurrent(
+        request,
+        () => currentUserIdRef.current,
+        () => Promise.all([
+          supabase.from('branches').select('*').eq('pharmacy_id', selectedMember.pharmacy_id),
+          supabase.from('role_permissions').select('permission').eq('role', userRole),
+          supabase.from('subscriptions').select('*').eq('pharmacy_id', selectedMember.pharmacy_id).maybeSingle(),
+        ]),
+      );
+      if (activationResult.status === 'superseded') return;
+      if (activationResult.status === 'failed') throw activationResult.error;
+      const [branchResponse, permissionResponse, subscriptionResponse] = activationResult.value;
+      if (branchResponse.error) throw new Error(`Failed to resolve eligible branches: ${branchResponse.error.message}`);
+      if (permissionResponse.error) throw new Error(`Failed to resolve role permissions: ${permissionResponse.error.message}`);
+      if (subscriptionResponse.error) throw new Error(`Failed to resolve subscription context: ${subscriptionResponse.error.message}`);
 
-      // Save UI preference in localStorage (convenience only, never treated as authorization)
-      try {
-        localStorage.setItem(LAST_PHARMACY_KEY, selectedMember.pharmacy_id);
-      } catch {
-        // Safe to ignore in private browsing modes
-      }
+      const branchResolution = resolveEligibleBranches(
+        authUser.id,
+        selectedMember,
+        selectedPharmacy,
+        (branchResponse.data || []) as Branch[],
+      );
+      const loadedPermissions = (permissionResponse.data || []).map((p: { permission: string }) => p.permission);
 
-      // 1. Resolve Default or Main Branch for Selected Pharmacy
-      let activeBranch: Branch | null = null;
-      if (selectedMember.default_branch_id) {
-        const { data: branchData } = await supabase
-          .from('branches')
-          .select('*')
-          .eq('id', selectedMember.default_branch_id)
-          .maybeSingle();
-        activeBranch = branchData || null;
-      }
+      requestGuardRef.current.publishIfCurrent(request, () => currentUserIdRef.current, () => {
+        // Publication and the existing preference hint write are one guarded,
+        // synchronous operation. No freshness decision survives an await.
+        setProfile(resolvedProfile);
+        setMemberships(resolvedMemberships);
+        setMembership(selectedMember);
+        setPharmacy(selectedPharmacy);
+        setBranches([...branchResolution.branches]);
+        setBranch(branchResolution.kind === 'ready' ? branchResolution.branch : null);
+        setRole(userRole);
+        setPermissions(loadedPermissions);
+        setSubscription((subscriptionResponse.data || null) as Subscription | null);
+        setError(null);
 
-      if (!activeBranch) {
-        const { data: mainBranchData } = await supabase
-          .from('branches')
-          .select('*')
-          .eq('pharmacy_id', selectedMember.pharmacy_id)
-          .eq('is_main', true)
-          .maybeSingle();
-        activeBranch = mainBranchData || null;
-      }
-      setBranch(activeBranch);
+        try {
+          // Existing pharmacy preference is only a hint and was revalidated above.
+          localStorage.setItem(LAST_PHARMACY_KEY, selectedMember.pharmacy_id);
+        } catch {
+          // Safe to ignore in private browsing modes.
+        }
 
-      // 2. Resolve Role Permissions for Selected Role
-      const { data: permData, error: permErr } = await supabase
-        .from('role_permissions')
-        .select('permission')
-        .eq('role', userRole);
-
-      if (permErr) {
-        console.warn('[PharmacyFlow Auth] Role permissions query notice:', permErr.message);
-      }
-      const loadedPermissions = (permData || []).map((p: { permission: string }) => p.permission);
-      setPermissions(loadedPermissions);
-
-      // 3. Resolve Subscription State for Selected Pharmacy
-      const { data: subData, error: subErr } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('pharmacy_id', selectedMember.pharmacy_id)
-        .maybeSingle();
-
-      if (subErr) {
-        console.warn('[PharmacyFlow Auth] Subscription query notice:', subErr.message);
-      }
-      setSubscription(subData || null);
-
-      setState('authenticated_ready');
+        if (branchResolution.kind === 'selection_required') {
+          pendingBranchTokenRef.current = request;
+          setState('authenticated_select_branch');
+        } else if (branchResolution.kind === 'unavailable') {
+          pendingBranchTokenRef.current = null;
+          setState('authenticated_no_branches');
+        } else {
+          pendingBranchTokenRef.current = null;
+          setState('authenticated_ready');
+        }
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to activate pharmacy session.';
-      setError(message);
-      setState('authenticated_error');
+      publishResolutionError(request, message);
     }
-  }, []);
+  }, [publishResolutionError]);
 
   /**
    * Authoritatively resolves all active pharmacy memberships from the database.
    */
   const resolveSessionContext = useCallback(async (authUser: User) => {
-    setState('authenticated_loading');
-    setError(null);
+    if (currentUserIdRef.current !== authUser.id) return;
+    const request = requestGuardRef.current.begin(authUser.id);
+    clearResolvedWorkspace('authenticated_loading');
 
     try {
       // 1. Resolve User Profile from public.user_profiles
-      const { data: profileData, error: profileErr } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .maybeSingle();
-
-      if (profileErr) {
-        console.warn('[PharmacyFlow Auth] Profile query notice:', profileErr.message);
-      }
-      setProfile(profileData || null);
+      if (!requestGuardRef.current.isCurrent(request, currentUserIdRef.current)) return;
+      const profileResult = await requestGuardRef.current.waitForCurrent(
+        request,
+        () => currentUserIdRef.current,
+        () => supabase.from('user_profiles').select('*').eq('id', authUser.id).maybeSingle(),
+      );
+      if (profileResult.status === 'superseded') return;
+      if (profileResult.status === 'failed') throw profileResult.error;
+      const { data: profileData, error: profileErr } = profileResult.value;
+      if (profileErr) throw new Error(`Failed to resolve user profile: ${profileErr.message}`);
 
       // 2. Query ALL Active Pharmacy Memberships for this User
-      const { data: memberRows, error: memberErr } = await supabase
-        .from('pharmacy_members')
-        .select('*')
-        .eq('user_id', authUser.id)
-        .eq('status', 'ACTIVE')
-        .order('created_at', { ascending: false });
+      if (!requestGuardRef.current.isCurrent(request, currentUserIdRef.current)) return;
+      const membershipResult = await requestGuardRef.current.waitForCurrent(
+        request,
+        () => currentUserIdRef.current,
+        () => supabase
+          .from('pharmacy_members')
+          .select('*')
+          .eq('user_id', authUser.id)
+          .eq('status', 'ACTIVE')
+          .order('created_at', { ascending: false }),
+      );
+      if (membershipResult.status === 'superseded') return;
+      if (membershipResult.status === 'failed') throw membershipResult.error;
+      const { data: memberRows, error: memberErr } = membershipResult.value;
 
       if (memberErr) {
         throw new Error('Failed to resolve pharmacy memberships: ' + memberErr.message);
       }
-
       if (!memberRows || memberRows.length === 0) {
-        setMemberships([]);
-        setMembership(null);
-        setPharmacy(null);
-        setBranch(null);
-        setRole(null);
-        setPermissions([]);
-        setSubscription(null);
-        setState('authenticated_no_membership');
+        requestGuardRef.current.publishIfCurrent(request, () => currentUserIdRef.current, () => {
+          setProfile(profileData || null);
+          setMemberships([]);
+          setState('authenticated_no_membership');
+        });
         return;
       }
 
       // 3. Query All Associated Pharmacy Entities
       const pharmacyIds = memberRows.map((m: PharmacyMember) => m.pharmacy_id);
-      const { data: pharmacyRows, error: pharmacyErr } = await supabase
-        .from('pharmacies')
-        .select('*')
-        .in('id', pharmacyIds);
+      if (!requestGuardRef.current.isCurrent(request, currentUserIdRef.current)) return;
+      const pharmacyResult = await requestGuardRef.current.waitForCurrent(
+        request,
+        () => currentUserIdRef.current,
+        () => supabase.from('pharmacies').select('*').in('id', pharmacyIds),
+      );
+      if (pharmacyResult.status === 'superseded') return;
+      if (pharmacyResult.status === 'failed') throw pharmacyResult.error;
+      const { data: pharmacyRows, error: pharmacyErr } = pharmacyResult.value;
 
       if (pharmacyErr) {
         throw new Error('Failed to load pharmacy details: ' + pharmacyErr.message);
       }
-
       const pharmacyMap = new Map((pharmacyRows || []).map((p: Pharmacy) => [p.id, p]));
       const enrichedMemberships: MembershipWithPharmacy[] = memberRows.map((m: PharmacyMember) => ({
         ...m,
         pharmacy: pharmacyMap.get(m.pharmacy_id)
       }));
-
-      setMemberships(enrichedMemberships);
+      if (enrichedMemberships.some((candidate) => !candidate.pharmacy)) {
+        throw new Error('An active membership references an unavailable pharmacy.');
+      }
 
       // 4. Determine Active Pharmacy Selection
       if (enrichedMemberships.length === 1) {
         // Exactly one membership: automatically select it
-        await activateMembership(enrichedMemberships[0]);
+        if (!requestGuardRef.current.isCurrent(request, currentUserIdRef.current)) return;
+        await activateMembership(authUser, enrichedMemberships[0], enrichedMemberships, profileData || null, request);
       } else {
         // Multiple active memberships: check if a valid prior selection is stored in localStorage
         let preferredPharmacyId: string | null = null;
@@ -182,18 +243,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (matchingMember) {
           // Stored preference is verified against active database memberships
-          await activateMembership(matchingMember);
+          if (!requestGuardRef.current.isCurrent(request, currentUserIdRef.current)) return;
+          await activateMembership(authUser, matchingMember, enrichedMemberships, profileData || null, request);
         } else {
           // Require explicit selection by the user
-          setState('authenticated_select_pharmacy');
+          requestGuardRef.current.publishIfCurrent(request, () => currentUserIdRef.current, () => {
+            setProfile(profileData || null);
+            setMemberships(enrichedMemberships);
+            setState('authenticated_select_pharmacy');
+          });
         }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'An error occurred resolving tenant context.';
-      setError(message);
-      setState('authenticated_error');
+      publishResolutionError(request, message);
     }
-  }, [activateMembership]);
+  }, [activateMembership, clearResolvedWorkspace, publishResolutionError]);
+
+  const sessionEffects = useMemo<SessionTransitionEffects<User>>(() => ({
+    invalidateWorkspace: () => requestGuardRef.current.invalidate(),
+    publishIdentity: (nextUser) => {
+      currentUserIdRef.current = nextUser.id;
+      setUser(nextUser);
+    },
+    clearIdentity: () => {
+      currentUserIdRef.current = null;
+      setUser(null);
+      clearResolvedWorkspace('unauthenticated');
+    },
+    resolveWorkspace: resolveSessionContext,
+  }), [clearResolvedWorkspace, resolveSessionContext]);
 
   // Initialize and listen to Supabase Auth lifecycle
   useEffect(() => {
@@ -204,23 +283,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // 1. Initial Session Check on Startup
-    supabase.auth.getSession().then(({ data: { session }, error: sessionErr }) => {
+    const initialSessionToken = sessionCoordinatorRef.current.beginInitialSessionRead();
+
+    // 1. Initial Session Check on Startup. An auth event invalidates this
+    // result so a late getSession response cannot restore an older identity.
+    supabase.auth.getSession().then(async ({ data: { session }, error: sessionErr }) => {
       if (!isMounted) return;
       if (sessionErr) {
         console.warn('[PharmacyFlow Auth] Initial getSession error:', sessionErr.message);
-        setState('unauthenticated');
+        await sessionCoordinatorRef.current.completeInitialSession(initialSessionToken, null, sessionEffects);
         return;
       }
-
-      if (session && session.user) {
-        setUser(session.user);
-        resolveSessionContext(session.user);
-      } else {
-        setState('unauthenticated');
-      }
+      await sessionCoordinatorRef.current.completeInitialSession(initialSessionToken, session?.user || null, sessionEffects);
     }).catch(() => {
-      if (isMounted) setState('unauthenticated');
+      if (isMounted) void sessionCoordinatorRef.current.completeInitialSession(initialSessionToken, null, sessionEffects);
     });
 
     // 2. Auth State Change Listener
@@ -228,22 +304,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       async (event, session) => {
         if (!isMounted) return;
 
-        if (event === 'SIGNED_OUT' || !session || !session.user) {
-          setUser(null);
-          setProfile(null);
-          setMemberships([]);
-          setMembership(null);
-          setPharmacy(null);
-          setBranch(null);
-          setRole(null);
-          setPermissions([]);
-          setSubscription(null);
-          setError(null);
-          setState('unauthenticated');
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          setUser(session.user);
-          await resolveSessionContext(session.user);
-        }
+        await sessionCoordinatorRef.current.applyAuthEvent(
+          event === 'SIGNED_OUT' || !session?.user ? null : session.user,
+          sessionEffects,
+        );
       }
     );
 
@@ -251,20 +315,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isMounted = false;
       authListener.unsubscribe();
     };
-  }, [resolveSessionContext]);
+  }, [sessionEffects]);
 
   /**
    * Switches the active session to another verified membership.
    */
   const selectPharmacy = useCallback(async (pharmacyId: string) => {
-    const targetMember = memberships.find((m) => m.pharmacy_id === pharmacyId);
+    if (!user || currentUserIdRef.current !== user.id) return;
+    const resolvedMemberships = memberships;
+    const resolvedProfile = profile;
+    const targetMember = selectMembershipForPharmacy(resolvedMemberships, user.id, pharmacyId);
+    const request = requestGuardRef.current.begin(user.id);
+    clearResolvedWorkspace('authenticated_loading');
     if (!targetMember) {
-      console.warn('[PharmacyFlow Auth] Cannot switch: user is not an active member of pharmacy', pharmacyId);
+      publishResolutionError(request, 'Selected pharmacy is not backed by a current active membership.');
       return;
     }
-    setState('authenticated_loading');
-    await activateMembership(targetMember);
-  }, [memberships, activateMembership]);
+    await activateMembership(user, targetMember, resolvedMemberships, resolvedProfile, request);
+  }, [activateMembership, clearResolvedWorkspace, memberships, profile, publishResolutionError, user]);
+
+  const selectBranch = useCallback((branchId: string) => {
+    const request = pendingBranchTokenRef.current;
+    if (!request || !requestGuardRef.current.isCurrent(request, currentUserIdRef.current)
+        || !user || !membership || !pharmacy) return;
+    const selected = selectEligibleBranch(user.id, membership, pharmacy, branches, branchId);
+    if (!selected) {
+      publishResolutionError(request, 'Selected branch is not eligible for the current active membership.');
+      return;
+    }
+    requestGuardRef.current.publishIfCurrent(request, () => currentUserIdRef.current, () => {
+      pendingBranchTokenRef.current = null;
+      setBranch(selected);
+      setError(null);
+      setState('authenticated_ready');
+    });
+  }, [branches, membership, pharmacy, publishResolutionError, user]);
+
+  const requestBranchSelection = useCallback(() => {
+    if (!user || !membership || !pharmacy || branches.length < 2
+        || currentUserIdRef.current !== user.id) return;
+    const request = requestGuardRef.current.begin(user.id);
+    pendingBranchTokenRef.current = request;
+    setBranch(null);
+    setError(null);
+    setState('authenticated_select_branch');
+  }, [branches, membership, pharmacy, user]);
 
   /**
    * Refreshes the active database context for the authenticated user.
@@ -302,6 +397,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
+    const attempt = sessionCoordinatorRef.current.beginSignIn();
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -309,19 +405,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (authError) {
+        sessionCoordinatorRef.current.failSignIn(attempt);
         return { error: authError };
       }
 
-      if (data.user) {
-        setUser(data.user);
-        await resolveSessionContext(data.user);
+      if (!data.user) {
+        sessionCoordinatorRef.current.failSignIn(attempt);
+        return { error: new Error('Sign-in completed without an authenticated identity.') };
+      }
+      const outcome = await sessionCoordinatorRef.current.completeSignIn(attempt, data.user, sessionEffects);
+      if (outcome === 'superseded') {
+        return { error: new Error('Sign-in attempt was superseded by a newer session transition.') };
       }
 
       return { error: null };
     } catch (err: unknown) {
+      sessionCoordinatorRef.current.failSignIn(attempt);
       return { error: err instanceof Error ? err : new Error('Sign-in failed.') };
     }
-  }, [resolveSessionContext]);
+  }, [sessionEffects]);
 
   /** Disabled until a separately reviewed trusted owner-identity provider exists. */
   const signUp = useCallback(async (
@@ -371,24 +473,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Signs out the active user and clears all in-memory session states.
    */
   const signOut = useCallback(async () => {
+    // Invalidate and unmount operational content before the external sign-out
+    // request. A late workspace response cannot republish this identity.
+    sessionCoordinatorRef.current.cancelSession(sessionEffects);
     try {
       await supabase.auth.signOut();
     } catch (err) {
       console.warn('[PharmacyFlow Auth] SignOut error:', err);
-    } finally {
-      setUser(null);
-      setProfile(null);
-      setMemberships([]);
-      setMembership(null);
-      setPharmacy(null);
-      setBranch(null);
-      setRole(null);
-      setPermissions([]);
-      setSubscription(null);
-      setError(null);
-      setState('unauthenticated');
     }
-  }, []);
+  }, [sessionEffects]);
 
   const value = useMemo<AuthContextValue>(() => ({
     state,
@@ -397,6 +490,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     memberships,
     membership,
     pharmacy,
+    branches,
     branch,
     role,
     permissions,
@@ -408,6 +502,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     acceptStaffInvitation,
     signOut,
     selectPharmacy,
+    selectBranch,
+    requestBranchSelection,
     refreshContext
   }), [
     state,
@@ -416,6 +512,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     memberships,
     membership,
     pharmacy,
+    branches,
     branch,
     role,
     permissions,
@@ -427,6 +524,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     acceptStaffInvitation,
     signOut,
     selectPharmacy,
+    selectBranch,
+    requestBranchSelection,
     refreshContext
   ]);
 

@@ -1,5 +1,39 @@
 # PharmacyFlow MVP capability matrix
 
+## PF-MVP-10 native-client conformance disposition - 2026-10-31
+
+Status: **LOCAL NATIVE-CLIENT TRANSCRIPT CONFORMANCE COMPLETE — FINAL EXECUTION GATE PENDING**. Approved-source prefix binding, migration notice forms, worker terminal notices, strict retention and all prior local closures pass. PostgreSQL behavior remains unverified.
+
+## PF-MVP-10 emitter/consumer conformance disposition - 2026-10-31
+
+Status: **LOCAL EMITTER/CONSUMER AND COORDINATOR CONFORMANCE COMPLETE — POSTGRESQL NOT RUN**. All executable acceptance SQL sources map to exact consumers, runtime proof is shared, and exact worker-event retention is synthetically verified. No database behavior or production acceptance is inferred.
+
+## PF-MVP-10 whole-command acceptance disposition - 2026-10-31
+
+Status: **COMPLETE LOCAL COMMAND-SURFACE REHEARSAL — PROTECTED EXECUTION NOT RUN**. All five commands share one exact 61-entry execution inventory, real preflight/dispatch path, structured outcomes and allowlisted evidence handling. Database behavior, real concurrency, Auth/provider/browser cases and production acceptance remain unverified.
+
+## PF-MVP-10 production-path integration disposition - 2026-10-31
+
+Status: **LOCAL RUNNER INTEGRATION CORRECTED AND INJECTED REHEARSAL READY — UNEXECUTED**. Exact PowerShell/C# binding, worker protocol, M-13 conflict semantics, Refund V2 transport-nonce boundaries and immutable-evidence cleanup refusal have local source/static/injected evidence. PostgreSQL/Supabase behavior, protected concurrency, Auth/provider/browser cases and production acceptance remain unverified.
+
+## Entitlement canonical-parity overlay - 2026-10-30
+
+| Boundary | Current source disposition | Acceptance limit |
+|---|---|---|
+| M-18 sale commit / Refund V2 | Exact service-gateway provenance guard delegates to latest sealed bodies | Source/synthetic only; PostgreSQL/concurrency not run |
+| Legacy sale return | Authenticated route retained; entitlement checked; no replay proof invented | Database/RLS behavior not run |
+| Inventory intake/adjust/transfer | Exact signatures/grants; guarded wrappers delegate to sealed arithmetic, permissions and responses | Database atomicity and ledger behavior not run |
+| Staff invitation/member lifecycle | Guarded wrappers delegate to sealed lifecycle; invite acceptance preserves token/email authority | Auth/provider and database behavior not run |
+| Direct-table mutations | No comprehensive enforcement claimed | Protected policy and execution decision remains open |
+
+## PF-SUP-2026-10-29-02 inventory correction overlay
+
+Inventory mutation client handling and local snapshot replacement are **LOCALLY ACCEPTED — SOURCE/SYNTHETIC/FAKE-INDEXEDDB** after sealed-contract response reconciliation (`101/101`) and complete preservation evidence (`42/42`). This does not verify RPC execution, RLS, ledger effects, browser behavior or production. Server-authoritative entitlement remains **DEFECTIVE DRAFT / PROTECTED AUTHORING NOT AUTHORIZED**; `000035` is untouched and must not be treated as integrated enforcement.
+
+## MVP-02-CLOSE local acceptance overlay - 2026-10-29
+
+Product/catalog, snapshot ingestion, batch intake, adjustments, transfers, cached stock/expiry attention and product detail are **LOCALLY ACCEPTED — SOURCE/SYNTHETIC/FAKE-INDEXEDDB**. Integrated evidence is 27/27 with focused existing suites and strict compilation passing. Database/RLS/RPC authority, stock-ledger effects, real browser/datastore and production acceptance remain **NOT RUN — OWNER DEFERRED**; AUTH-02 is unchanged.
+
 ## PF-SUP-2026-10-25-11 local correction overlay
 
 Capability-level subscription containment remains advisory client enforcement, not authoritative server entitlement. The production async boundaries for customer, supplier, device and cash mutations now clear their busy indicators whenever tenant/branch/user scope or entitlement eligibility changes; delayed completions remain rejected by generation. Focused scope/expiry/renewal tests are local synthetic evidence only. Historical reads and durable checkout recovery/acknowledgment remain available according to their existing capability policy; no protected Refund V2 or server contract changed.
@@ -54,3 +88,16 @@ PF-SUP-2026-10-23-08 preserves M1 as a completed inventory, not an acceptance cl
 - M3 offline/transaction integrity: `PARTIAL`; local corrections exist, protected acceptance is not run.
 - M4 admin/onboarding/subscriptions/referrals: `PARTIAL`; Admin/client containment exists, protected commercial contracts are missing or design-only.
 - M5 release preparation: `PARTIAL`; evidence/manifests/runbooks exist, critical acceptance and deployment remain unauthorized.
+
+## PF-MVP-08 foundation security delta
+
+| Capability | Status | Evidence | Remaining gate |
+|---|---|---|---|
+| Request-bound entitlement contract | LOCALLY CORRECTED | `lifecycle.ts`, `entitlementAdapter.ts`, focused regressions | Independent review; PostgreSQL RPC behavior not run |
+| Exact-operation replay authorization | LOCALLY CORRECTED AT FOUNDATION | `foundationSecurity.ts`, unexecuted `000036` | Route wiring and database/concurrency acceptance |
+| Administrative decision model | LOCALLY CORRECTED AT FOUNDATION | pure helper and private SQL proposal | PostgreSQL behavior and protected admin authoring/wiring |
+| Business-route enforcement | NOT IMPLEMENTED | source-backed enforcement matrix | Explicit protected owner authorization |
+
+PF-SUP-2026-10-29-04 correction: the production adapter now targets the v2 effective evaluator; replay proof consumption is full-scope and microsecond administrative ordering is locally demonstrated. Trusted evidence production is **AUTHORED BUT UNWIRED**. No route currently provides end-to-end entitlement enforcement.
+
+PF-SUP-2026-10-30-01 correction: PF-MVP-09/R/S operational replacements are **QUARANTINED / NOT IMPLEMENTED**. The malformed migration is not executable, M-18/Refund V2/inventory/transfer parity is not preserved, and direct-table gaps remain. The runnable lineage stops at `000036`.

@@ -6,6 +6,8 @@ export type SessionState =
   | 'unauthenticated'
   | 'authenticated_loading'
   | 'authenticated_select_pharmacy'
+  | 'authenticated_select_branch'
+  | 'authenticated_no_branches'
   | 'authenticated_ready'
   | 'authenticated_no_membership'
   | 'authenticated_error';
@@ -21,6 +23,7 @@ export interface AuthContextValue {
   memberships: MembershipWithPharmacy[];
   membership: PharmacyMember | null;
   pharmacy: Pharmacy | null;
+  branches: Branch[];
   branch: Branch | null;
   role: UserRole | null;
   permissions: string[];
@@ -32,5 +35,7 @@ export interface AuthContextValue {
   acceptStaffInvitation: (invitationId: string, rawToken: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   selectPharmacy: (pharmacyId: string) => Promise<void>;
+  selectBranch: (branchId: string) => void;
+  requestBranchSelection: () => void;
   refreshContext: () => Promise<void>;
 }

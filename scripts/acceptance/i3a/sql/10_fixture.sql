@@ -64,12 +64,12 @@ DO $fixtures$
 DECLARE k text; attrs text; existing record;
 BEGIN
  FOREACH k IN ARRAY ARRAY['i3a-gateway-0001','i3a-gateway-0002'] LOOP
-   attrs:=encode(digest(convert_to(CASE WHEN k='i3a-gateway-0001' THEN 'active=true|version=1|ELIGIBILITY_RESERVE,IDENTITY_ISSUE,IDENTITY_RECOVER' ELSE 'active=true|version=1|ELIGIBILITY_RESERVE' END,'UTF8'),'sha256'),'hex');
+   attrs:=encode(digest(convert_to(CASE WHEN k='i3a-gateway-0001' THEN 'active=true|version=1|ELIGIBILITY_RESERVE,IDENTITY_ISSUE,IDENTITY_RECOVER' ELSE 'active=true|version=1|IDENTITY_ISSUE,IDENTITY_RECOVER' END,'UTF8'),'sha256'),'hex');
    SELECT * INTO existing FROM public.owner_gateway_authorities WHERE principal_id=k FOR UPDATE;
    IF FOUND AND NOT EXISTS(SELECT 1 FROM public.pf_i3a_fixture_objects WHERE object_kind='gateway-authority' AND object_id=k AND run_id='I3A-20261026-001' AND attributes_digest=attrs) THEN RAISE EXCEPTION 'unknown existing gateway identity %; refusing adoption',k; END IF;
-   IF FOUND AND NOT (existing.active AND existing.credential_version=1 AND existing.capabilities=(CASE WHEN k='i3a-gateway-0001' THEN ARRAY['ELIGIBILITY_RESERVE','IDENTITY_ISSUE','IDENTITY_RECOVER'] ELSE ARRAY['ELIGIBILITY_RESERVE'] END)) THEN RAISE EXCEPTION 'gateway fixture attributes mismatch %',k; END IF;
+   IF FOUND AND NOT (existing.active AND existing.credential_version=1 AND existing.capabilities=(CASE WHEN k='i3a-gateway-0001' THEN ARRAY['ELIGIBILITY_RESERVE','IDENTITY_ISSUE','IDENTITY_RECOVER'] ELSE ARRAY['IDENTITY_ISSUE','IDENTITY_RECOVER'] END)) THEN RAISE EXCEPTION 'gateway fixture attributes mismatch %',k; END IF;
    IF NOT FOUND THEN
-    INSERT INTO public.owner_gateway_authorities VALUES(k,true,1,CASE WHEN k='i3a-gateway-0001' THEN ARRAY['ELIGIBILITY_RESERVE','IDENTITY_ISSUE','IDENTITY_RECOVER'] ELSE ARRAY['ELIGIBILITY_RESERVE'] END,timezone('utc',now()));
+    INSERT INTO public.owner_gateway_authorities VALUES(k,true,1,CASE WHEN k='i3a-gateway-0001' THEN ARRAY['ELIGIBILITY_RESERVE','IDENTITY_ISSUE','IDENTITY_RECOVER'] ELSE ARRAY['IDENTITY_ISSUE','IDENTITY_RECOVER'] END,timezone('utc',now()));
     INSERT INTO public.pf_i3a_fixture_objects VALUES('gateway-authority',k,'I3A-20261026-001',attrs);
    END IF;
  END LOOP;
@@ -86,5 +86,46 @@ BEGIN
  IF EXISTS(SELECT 1 FROM public.owner_gateway_authorities WHERE principal_id LIKE 'i3a-%' AND principal_id NOT IN('i3a-gateway-0001','i3a-gateway-0002'))
  OR EXISTS(SELECT 1 FROM public.owner_operator_authorities WHERE principal_id LIKE 'i3a-%' AND principal_id NOT IN('i3a-operator-0001','i3a-operator-none-0001')) THEN RAISE EXCEPTION 'unknown I3A-like identity exists'; END IF;
 END $fixtures$;
+
+-- Disposable grants are explicit fixture data, not runtime authority provisioning. They exist
+-- only for this owner-approved acceptance run and are tracked as separately owned objects.
+DO $scope_fixtures$
+DECLARE s record; existing record; scope_object_id text; attrs text;
+BEGIN
+ FOR s IN SELECT * FROM (VALUES
+   ('i3a-gateway-0001','IDENTITY_ISSUE','c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf','10000000-0000-4000-8000-000000000001'::uuid),
+   ('i3a-gateway-0001','IDENTITY_RECOVER','c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf','10000000-0000-4000-8000-000000000001'::uuid),
+   ('i3a-gateway-0001','IDENTITY_ISSUE','0f46f0ba6b7213ccafdfd4a8245a5b323735e7970e69f67cdbf0a3ab00633d29','10000000-0000-4000-8000-000000000002'::uuid),
+   ('i3a-gateway-0001','IDENTITY_RECOVER','0f46f0ba6b7213ccafdfd4a8245a5b323735e7970e69f67cdbf0a3ab00633d29','10000000-0000-4000-8000-000000000002'::uuid),
+   ('i3a-gateway-0002','IDENTITY_ISSUE','c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf','10000000-0000-4000-8000-000000000001'::uuid),
+   ('i3a-gateway-0002','IDENTITY_RECOVER','c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf','10000000-0000-4000-8000-000000000001'::uuid)
+ ) AS v(principal_id,capability,applicant_key,pharmacy_context_id) LOOP
+   scope_object_id:=concat_ws('|',s.principal_id,s.capability,s.applicant_key,s.pharmacy_context_id::text);
+   attrs:=encode(digest(convert_to('active=true|'||scope_object_id,'UTF8'),'sha256'),'hex');
+   SELECT * INTO existing FROM public.owner_gateway_authority_scopes
+    WHERE principal_id=s.principal_id AND capability=s.capability
+      AND applicant_key=s.applicant_key AND pharmacy_context_id=s.pharmacy_context_id FOR UPDATE;
+   IF FOUND AND NOT EXISTS(SELECT 1 FROM public.pf_i3a_fixture_objects
+      WHERE object_kind='gateway-authority-scope' AND pf_i3a_fixture_objects.object_id=scope_object_id
+        AND run_id='I3A-20261026-001' AND attributes_digest=attrs) THEN
+     RAISE EXCEPTION 'unknown existing gateway scope %; refusing adoption',scope_object_id; END IF;
+   IF FOUND AND existing.active IS DISTINCT FROM true THEN
+     RAISE EXCEPTION 'gateway scope fixture attributes mismatch %',scope_object_id; END IF;
+   IF NOT FOUND THEN
+     INSERT INTO public.owner_gateway_authority_scopes(principal_id,capability,applicant_key,pharmacy_context_id,active)
+       VALUES(s.principal_id,s.capability,s.applicant_key,s.pharmacy_context_id,true);
+     INSERT INTO public.pf_i3a_fixture_objects VALUES('gateway-authority-scope',scope_object_id,'I3A-20261026-001',attrs);
+   END IF;
+ END LOOP;
+ IF EXISTS(SELECT 1 FROM public.owner_gateway_authority_scopes WHERE principal_id LIKE 'i3a-%'
+  AND (principal_id,capability,applicant_key,pharmacy_context_id) NOT IN (
+   ('i3a-gateway-0001','IDENTITY_ISSUE','c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf','10000000-0000-4000-8000-000000000001'::uuid),
+   ('i3a-gateway-0001','IDENTITY_RECOVER','c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf','10000000-0000-4000-8000-000000000001'::uuid),
+   ('i3a-gateway-0001','IDENTITY_ISSUE','0f46f0ba6b7213ccafdfd4a8245a5b323735e7970e69f67cdbf0a3ab00633d29','10000000-0000-4000-8000-000000000002'::uuid),
+   ('i3a-gateway-0001','IDENTITY_RECOVER','0f46f0ba6b7213ccafdfd4a8245a5b323735e7970e69f67cdbf0a3ab00633d29','10000000-0000-4000-8000-000000000002'::uuid),
+   ('i3a-gateway-0002','IDENTITY_ISSUE','c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf','10000000-0000-4000-8000-000000000001'::uuid),
+   ('i3a-gateway-0002','IDENTITY_RECOVER','c2d396e8f8a83479f2e5718aedd9a746b493540ec98baa7b23e51aad29977bcf','10000000-0000-4000-8000-000000000001'::uuid)
+  )) THEN RAISE EXCEPTION 'unknown I3A-like gateway scope exists'; END IF;
+END $scope_fixtures$;
 COMMIT;
 SELECT 'PF_I3A_RESULT=' || json_build_object('schema','pharmacyflow-i3a-process-v1','kind','10_fixture','payload',json_build_object('status','FIXTURE_COMMITTED'))::text;

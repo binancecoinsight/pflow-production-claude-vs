@@ -33,6 +33,7 @@ interface ProductDetailModalProps {
   onEditProduct?: (product: LocalProduct) => void;
   onToggleProductStatus?: (product: LocalProduct) => void;
   isTogglingStatus?: boolean;
+  batchEvidenceState?: 'loading' | 'ready' | 'unavailable';
   onClose: () => void;
 }
 
@@ -48,6 +49,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onEditProduct,
   onToggleProductStatus,
   isTogglingStatus = false,
+  batchEvidenceState = 'ready',
   onClose
 }) => {
   if (!product) return null;
@@ -148,7 +150,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div>
             <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-semibold">Batch Count</span>
             <span className="text-white font-mono text-sm mt-0.5 block">
-              {batches.length} {batches.length === 1 ? 'batch' : 'batches'}
+              {batchEvidenceState === 'ready'
+                ? `${batches.length} ${batches.length === 1 ? 'batch' : 'batches'}`
+                : 'Unavailable'}
             </span>
           </div>
 
@@ -163,7 +167,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 ? 'text-amber-400'
                 : 'text-emerald-400'
             }`}>
-              {totalProjectedStock < 0
+              {batchEvidenceState !== 'ready'
+                ? 'Unavailable'
+                : totalProjectedStock < 0
                 ? `${totalProjectedStock} (Deficit)`
                 : `${totalProjectedStock} units`}
             </span>
@@ -190,7 +196,20 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </span>
           </div>
 
-          {batches.length === 0 ? (
+          {batchEvidenceState === 'loading' ? (
+            <div className="py-12 text-center text-slate-400 border border-dashed border-slate-800 rounded-xl" role="status">
+              <Loader2 className="w-8 h-8 mx-auto text-slate-500 mb-2 animate-spin" />
+              <p className="text-xs font-medium">Validating cached batch expiry evidence…</p>
+            </div>
+          ) : batchEvidenceState === 'unavailable' ? (
+            <div className="py-12 px-5 text-center text-rose-300 bg-rose-500/5 border border-rose-500/20 rounded-xl" role="alert">
+              <ShieldAlert className="w-8 h-8 mx-auto text-rose-400 mb-2" />
+              <p className="text-xs font-semibold">Batch expiry evidence is unavailable or invalid.</p>
+              <p className="text-[11px] text-rose-200/80 mt-1">
+                No batch count, projected quantity, expiry status or provisional FEFO recommendation can be confirmed from this cache.
+              </p>
+            </div>
+          ) : batches.length === 0 ? (
             <div className="py-12 text-center text-slate-400 border border-dashed border-slate-800 rounded-xl">
               <Package className="w-8 h-8 mx-auto text-slate-600 mb-2 opacity-50" />
               <p className="text-xs font-medium">No inventory batches recorded for this product.</p>

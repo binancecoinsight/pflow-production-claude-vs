@@ -188,6 +188,7 @@ export interface GatewayPipelineDeps {
   getDevice: (deviceId: string) => Promise<{ id: string; pharmacy_id: string; branch_id: string; status: string; public_key_pem: string } | null>;
   consumeNonce: (nonce: string, pharmacyId: string, deviceId: string) => Promise<boolean>;
   ingestStock: (params: {
+    actor_user_id: string;
     client_op_id: string;
     pharmacy_id: string;
     branch_id: string;
@@ -567,7 +568,7 @@ export async function executeGatewayPipeline(
           });
         }
         rpcResult = await deps.ingestStock({
-          client_op_id, pharmacy_id, branch_id, device_id, sale_id,
+          actor_user_id: authUserId, client_op_id, pharmacy_id, branch_id, device_id, sale_id,
           product_id: product_id!, batch_id: batch_id!, quantity: quantity!,
           payload_hash: computedPayloadHash
         });
@@ -674,7 +675,19 @@ export async function handleSyncPushSale(req: Request): Promise<Response> {
       return !error && data === true;
     },
     ingestStock: async (params) => {
-      const { data, error } = await supabaseAdmin.rpc('rpc_ingest_sale_stock_movement', {
+      const operationClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { persistSession: false },
+        global: { headers: {
+          'X-PharmacyFlow-Actor-Id': params.actor_user_id,
+          'X-PharmacyFlow-Pharmacy-Id': params.pharmacy_id,
+          'X-PharmacyFlow-Branch-Id': params.branch_id,
+          'X-PharmacyFlow-Device-Id': params.device_id,
+          'X-PharmacyFlow-Operation-Kind': 'SALE_CREATE',
+          'X-PharmacyFlow-Client-Operation-Id': params.client_op_id,
+          'X-PharmacyFlow-Payload-Fingerprint': params.payload_hash
+        } }
+      });
+      const { data, error } = await operationClient.rpc('rpc_ingest_sale_stock_movement', {
         p_client_op_id: params.client_op_id,
         p_pharmacy_id: params.pharmacy_id,
         p_branch_id: params.branch_id,
@@ -691,7 +704,19 @@ export async function handleSyncPushSale(req: Request): Promise<Response> {
       return row;
     },
     commitSale: async (params) => {
-      const { data, error } = await supabaseAdmin.rpc('rpc_commit_sale_v1', {
+      const operationClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { persistSession: false },
+        global: { headers: {
+          'X-PharmacyFlow-Actor-Id': params.actor_user_id,
+          'X-PharmacyFlow-Pharmacy-Id': params.pharmacy_id,
+          'X-PharmacyFlow-Branch-Id': params.branch_id,
+          'X-PharmacyFlow-Device-Id': params.device_id,
+          'X-PharmacyFlow-Operation-Kind': 'SALE_COMMIT',
+          'X-PharmacyFlow-Client-Operation-Id': params.client_op_id,
+          'X-PharmacyFlow-Payload-Fingerprint': params.payload_hash
+        } }
+      });
+      const { data, error } = await operationClient.rpc('rpc_commit_sale_v1', {
         p_actor_user_id: params.actor_user_id,
         p_client_op_id: params.client_op_id,
         p_checkout_intent_id: params.checkout_intent_id,

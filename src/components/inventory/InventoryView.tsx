@@ -28,6 +28,18 @@ import { StockTransfersTab } from './StockTransfersTab';
 import { fetchBranches, setProductStatus } from '../../lib/inventory/service';
 import { StockTransferWithBranches } from '../../lib/inventory/types';
 import { ProductFormModal } from './ProductFormModal';
+import { ExpiryAttentionPanel } from './ExpiryAttentionPanel';
+import { StockAttentionPanel } from './StockAttentionPanel';
+import {
+  deriveExpiryAttentionWorkspace,
+  expiryAttentionWorkspaceKey,
+} from '../../lib/inventory/expiryAttention';
+import { deriveStockAttention } from '../../lib/inventory/stockAttention';
+import {
+  ProductDetailLoadBinding,
+  ProductDetailLoadCoordinator,
+  runProductDetailLoad,
+} from '../../lib/inventory/productDetailLoad';
 import { AlertTriangle, Lock, ShieldCheck, ArrowRightLeft, Package } from 'lucide-react';
 
 /**
@@ -94,6 +106,16 @@ export const canTransferStock = (role: string | null | undefined, permissions: s
 
 export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutationsAllowed = true }) => {
   const { user, profile, pharmacy, branch, membership, role, permissions } = useAuth();
+  const coherentWorkspace = deriveExpiryAttentionWorkspace({
+    userId: user?.id ?? null,
+    membership,
+    pharmacy,
+    branch,
+    role,
+  });
+  const coherentWorkspaceKey = coherentWorkspace
+    ? expiryAttentionWorkspaceKey(coherentWorkspace)
+    : null;
 
   // Network Connectivity State
   const [onlineStatus, setOnlineStatus] = useState<boolean>(isOnline());
@@ -114,11 +136,50 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
+  const [catalogReadError, setCatalogReadError] = useState<boolean>(false);
+  const [loadedCatalogQuery, setLoadedCatalogQuery] = useState<string | null>(null);
 
   // Selected Product & Batch Inspector Modal
   const [selectedProduct, setSelectedProduct] = useState<LocalProduct | null>(null);
   const [selectedBatches, setSelectedBatches] = useState<Array<LocalBatch & { expiry: BatchExpiryInfo }>>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState<boolean>(false);
+  const [batchEvidenceUnavailable, setBatchEvidenceUnavailable] = useState<boolean>(false);
+  const productDetailCoordinatorRef = useRef<ProductDetailLoadCoordinator | null>(null);
+  if (!productDetailCoordinatorRef.current) {
+    productDetailCoordinatorRef.current = new ProductDetailLoadCoordinator();
+  }
+  const selectedProductIdRef = useRef<string | null>(null);
+  const productDetailWorkspaceRef = useRef<{ workspaceKey: string; pharmacyId: string } | null>(null);
+  productDetailWorkspaceRef.current = coherentWorkspace && coherentWorkspaceKey
+    ? { workspaceKey: coherentWorkspaceKey, pharmacyId: coherentWorkspace.pharmacyId }
+    : null;
+
+  const currentProductDetailBinding = useCallback((): ProductDetailLoadBinding | null => {
+    const workspace = productDetailWorkspaceRef.current;
+    const productId = selectedProductIdRef.current;
+    return workspace && productId ? { ...workspace, productId } : null;
+  }, []);
+
+  const invalidateProductDetail = useCallback(() => {
+    productDetailCoordinatorRef.current?.invalidate();
+    selectedProductIdRef.current = null;
+    setSelectedProduct(null);
+    setSelectedBatches([]);
+    setBatchEvidenceUnavailable(false);
+    setIsLoadingBatches(false);
+  }, []);
+
+  useEffect(() => {
+    invalidateProductDetail();
+  }, [coherentWorkspaceKey, invalidateProductDetail]);
+
+  useEffect(() => {
+    productDetailCoordinatorRef.current?.activate();
+    return () => {
+      productDetailCoordinatorRef.current?.dispose();
+      selectedProductIdRef.current = null;
+    };
+  }, []);
 
   // Authoritative Stock Intake Modal (Phase 5D-15)
   const [isStockIntakeOpen, setIsStockIntakeOpen] = useState<boolean>(false);
@@ -141,6 +202,7 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
 
   // Active Pharmacy Guard Ref
   const activePharmacyIdRef = useRef<string | null>(null);
+  const catalogRequestGenerationRef = useRef<number>(0);
 
   // Load pharmacy branches for transfer route selection
   useEffect(() => {
@@ -161,11 +223,18 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
 
   // 2. Load Local Inventory Read Model for Active Pharmacy
   const loadLocalCatalog = useCallback(async (pharmacyId: string, query: string = '') => {
+    const normalizedQuery = query.trim();
+    const requestGeneration = ++catalogRequestGenerationRef.current;
+    const isCurrentRequest = () => (
+      activePharmacyIdRef.current === pharmacyId
+      && catalogRequestGenerationRef.current === requestGeneration
+    );
     try {
       setIsLoading(true);
+      setCatalogReadError(false);
       let prods: LocalProduct[] = [];
-      if (query.trim()) {
-        prods = await searchProducts(pharmacyId, query.trim(), 100);
+      if (normalizedQuery) {
+        prods = await searchProducts(pharmacyId, normalizedQuery, 100);
       } else {
         prods = await listLocalProducts(pharmacyId, 200);
       }
@@ -179,21 +248,24 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
         })
       );
 
-      // Verify tenant has not changed mid-query
-      if (activePharmacyIdRef.current === pharmacyId) {
+      // Resolve freshness before one coherent publication of records and metadata.
+      const fresh = await checkCatalogFreshness(pharmacyId);
+      if (isCurrentRequest()) {
         setProducts(prods);
         setBatchesMap(newBatchesMap);
-      }
-
-      // Update Freshness
-      const fresh = await checkCatalogFreshness(pharmacyId);
-      if (activePharmacyIdRef.current === pharmacyId) {
         setFreshness(fresh);
+        setLoadedCatalogQuery(normalizedQuery);
       }
     } catch (err: unknown) {
       console.error('[InventoryView] Failed to load local read model:', err);
+      if (isCurrentRequest()) {
+        setProducts([]);
+        setBatchesMap({});
+        setLoadedCatalogQuery(null);
+        setCatalogReadError(true);
+      }
     } finally {
-      if (activePharmacyIdRef.current === pharmacyId) {
+      if (isCurrentRequest()) {
         setIsLoading(false);
       }
     }
@@ -202,10 +274,14 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
   // 3. Tenant Boundary Reset & Initial Load on Pharmacy Change
   useEffect(() => {
     if (!pharmacy?.id) {
+      catalogRequestGenerationRef.current += 1;
       setProducts([]);
       setBatchesMap({});
+      setLoadedCatalogQuery(null);
+      setCatalogReadError(false);
       setSelectedProduct(null);
       setSelectedBatches([]);
+      setBatchEvidenceUnavailable(false);
       activePharmacyIdRef.current = null;
       return;
     }
@@ -215,8 +291,11 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
       activePharmacyIdRef.current = pharmacy.id;
       setProducts([]);
       setBatchesMap({});
+      setLoadedCatalogQuery(null);
+      setCatalogReadError(false);
       setSelectedProduct(null);
       setSelectedBatches([]);
+      setBatchEvidenceUnavailable(false);
       setSearchQuery('');
       setSyncErrorMessage(null);
     }
@@ -268,22 +347,39 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
 
   // 6. Inspect Product Batches Handler
   const handleSelectProduct = useCallback(async (product: LocalProduct) => {
-    if (!pharmacy?.id) return;
-    setSelectedProduct(product);
-    setIsLoadingBatches(true);
-
-    try {
-      const evaluatedBatches = await getEligibleBatchesForProduct(pharmacy.id, product.id, { allowExpired: true });
-      // Sort batches by earliest expiry date first
-      evaluatedBatches.sort((a, b) => a.expiry_date.localeCompare(b.expiry_date));
-      setSelectedBatches(evaluatedBatches);
-    } catch (err: unknown) {
-      console.error('[InventoryView] Error reading batches:', err);
-      setSelectedBatches([]);
-    } finally {
-      setIsLoadingBatches(false);
+    const workspace = productDetailWorkspaceRef.current;
+    const coordinator = productDetailCoordinatorRef.current;
+    if (!workspace || !coordinator || product.pharmacy_id !== workspace.pharmacyId) {
+      invalidateProductDetail();
+      return;
     }
-  }, [pharmacy?.id]);
+    const binding: ProductDetailLoadBinding = {
+      ...workspace,
+      productId: product.id,
+    };
+    selectedProductIdRef.current = product.id;
+    setSelectedProduct(product);
+    setSelectedBatches([]);
+    setBatchEvidenceUnavailable(false);
+
+    await runProductDetailLoad({
+      coordinator,
+      binding,
+      currentBinding: currentProductDetailBinding,
+      load: () => getEligibleBatchesForProduct(binding.pharmacyId, binding.productId, { allowExpired: true }),
+      publishLoading: setIsLoadingBatches,
+      publishSuccess: (evaluatedBatches) => {
+        const sortedBatches = [...evaluatedBatches]
+          .sort((a, b) => a.expiry_date.localeCompare(b.expiry_date));
+        setSelectedBatches(sortedBatches);
+        setBatchEvidenceUnavailable(false);
+      },
+      publishUnavailable: () => {
+        setSelectedBatches([]);
+        setBatchEvidenceUnavailable(true);
+      },
+    });
+  }, [currentProductDetailBinding, invalidateProductDetail]);
 
   // Permission: Cost Price Visibility & Stock Operations Authorization
   const canSeeCostPrice = canViewCostPrice(role, permissions);
@@ -291,6 +387,20 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
   const canAdjustStock = mutationsAllowed && canAdjustInventory(role, permissions);
   const canTransfer = mutationsAllowed && canTransferStock(role, permissions);
   const canManage = mutationsAllowed && canManageCatalog(role, permissions);
+  const inventoryEvidenceLoading = isLoading || loadedCatalogQuery !== searchQuery.trim();
+  const stockAttention = deriveStockAttention({
+    binding: coherentWorkspace,
+    products,
+    batchesMap,
+    freshness,
+    searchQuery,
+    productLimit: searchQuery.trim() ? 100 : 200,
+  });
+  const stockEvidenceState = catalogReadError
+    ? 'unavailable' as const
+    : inventoryEvidenceLoading
+      ? 'loading' as const
+      : 'ready' as const;
 
   useEffect(() => {
     if (mutationsAllowed) return;
@@ -360,6 +470,9 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
       </div>
     );
   }
+
+  const expiryAttentionBinding = coherentWorkspace;
+  const expiryAttentionLoading = inventoryEvidenceLoading;
 
   return (
     <div className="w-full">
@@ -462,18 +575,37 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
           }}
         />
       ) : (
-        <ProductList
-          products={products}
-          selectedProductId={selectedProduct?.id || null}
-          onSelectProduct={handleSelectProduct}
-          currency={pharmacy.currency || 'NGN'}
-          canSeeCostPrice={canSeeCostPrice}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          batchesMap={batchesMap}
-          isLoading={isLoading}
-          onSync={handleSync}
-        />
+        <>
+          <StockAttentionPanel
+            key={stockAttention.workspaceKey ?? 'stock-attention-unavailable'}
+            result={stockAttention}
+            evidenceState={stockEvidenceState}
+          />
+          <ExpiryAttentionPanel
+            key={expiryAttentionBinding ? expiryAttentionWorkspaceKey(expiryAttentionBinding) : 'expiry-attention-unavailable'}
+            binding={expiryAttentionBinding}
+            products={products}
+            batchesMap={batchesMap}
+            freshness={freshness}
+            searchQuery={searchQuery}
+            productLimit={searchQuery.trim() ? 100 : 200}
+            isLoading={expiryAttentionLoading}
+            loadError={catalogReadError}
+          />
+          <ProductList
+            products={products}
+            selectedProductId={selectedProduct?.id || null}
+            onSelectProduct={handleSelectProduct}
+            currency={pharmacy.currency || 'NGN'}
+            canSeeCostPrice={canSeeCostPrice}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            stockAttention={stockAttention}
+            stockEvidenceState={stockEvidenceState}
+            isLoading={isLoading}
+            onSync={handleSync}
+          />
+        </>
       )}
 
       {/* Product Detail & Batch Inspector Modal */}
@@ -494,10 +626,8 @@ export const InventoryView: React.FC<{ mutationsAllowed?: boolean }> = ({ mutati
           onEditProduct={handleOpenEditProduct}
           onToggleProductStatus={handleToggleProductStatus}
           isTogglingStatus={isTogglingStatus}
-          onClose={() => {
-            setSelectedProduct(null);
-            setSelectedBatches([]);
-          }}
+          batchEvidenceState={isLoadingBatches ? 'loading' : batchEvidenceUnavailable ? 'unavailable' : 'ready'}
+          onClose={invalidateProductDetail}
         />
       )}
 

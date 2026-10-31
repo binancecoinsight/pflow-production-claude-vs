@@ -5,10 +5,12 @@ import { NoMembershipScreen } from './components/NoMembershipScreen';
 import { SelectPharmacyScreen } from './components/SelectPharmacyScreen';
 import { AuthenticatedShell } from './components/AuthenticatedShell';
 import { OfflineSyncRuntime } from './components/OfflineSyncRuntime';
+import { BranchSelectionScreen } from './components/BranchSelectionScreen';
+import { isReadyWorkspace } from './lib/auth/membershipWorkspace';
 import { RefreshCw, AlertCircle, LogOut } from 'lucide-react';
 
 function AppContent() {
-  const { state, error, refreshContext, signOut } = useAuth();
+  const { state, error, user, membership, pharmacy, branch, role, refreshContext, signOut } = useAuth();
 
   // 1. Initializing or Loading Context
   if (state === 'initializing' || state === 'authenticated_loading') {
@@ -40,8 +42,36 @@ function AppContent() {
     return <SelectPharmacyScreen />;
   }
 
-  // 5. Authenticated & Context Ready
+  // 5. Authenticated with a pharmacy but awaiting explicit branch choice.
+  if (state === 'authenticated_select_branch') {
+    return <BranchSelectionScreen />;
+  }
+
+  if (state === 'authenticated_no_branches') {
+    return <BranchSelectionScreen unavailable />;
+  }
+
+  // 6. Authenticated & Context Ready. State alone is insufficient: refuse
+  // to mount operational runtimes unless all published bindings cohere.
   if (state === 'authenticated_ready') {
+    if (!isReadyWorkspace({
+      userId: user?.id || null,
+      membership,
+      pharmacy,
+      branch,
+      role,
+    })) {
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">
+          <div className="max-w-md rounded-2xl border border-rose-500/30 bg-slate-900 p-6 text-center">
+            <AlertCircle className="mx-auto mb-3 h-6 w-6 text-rose-400" />
+            <h2 className="font-bold text-white">Workspace Binding Rejected</h2>
+            <p className="mt-2 text-xs text-slate-400">The resolved user, membership, pharmacy, role, and branch do not form one coherent active workspace.</p>
+            <button type="button" onClick={() => refreshContext()} className="mt-4 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold">Resolve again</button>
+          </div>
+        </div>
+      );
+    }
     return (
       <>
         <OfflineSyncRuntime />
@@ -50,7 +80,7 @@ function AppContent() {
     );
   }
 
-  // 6. Authenticated Error State
+  // 7. Authenticated Error State
   if (state === 'authenticated_error') {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4">
